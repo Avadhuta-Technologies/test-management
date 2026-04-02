@@ -38,10 +38,10 @@ export default function App() {
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-center justify-center">
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-10 flex flex-col items-center gap-5 w-full max-w-sm">
           <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center">
-            <span className="text-white text-xl font-bold">Q</span>
+            <span className="text-white text-xl font-bold">at</span>
           </div>
           <div className="text-center">
-            <h1 className="text-xl font-bold text-gray-800">QualifyMe</h1>
+            <h1 className="text-xl font-bold text-gray-800">Avadhuta Technologies</h1>
             <p className="text-sm text-gray-600 mt-1">Sign in with your GitHub account</p>
           </div>
           <button
