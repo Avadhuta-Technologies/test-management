@@ -127,10 +127,12 @@ export async function updateClickUpTask(token: string, taskId: string, bug: Bug)
 
 export function clickupStatusToBugStatus(cuStatus: string): BugStatus | null {
   const s = cuStatus.toLowerCase();
-  if (s === "complete" || s === "closed" || s === "done") return "Closed";
-  if (s === "in progress" || s === "in review") return "In Progress";
-  if (s === "open" || s === "to do" || s === "backlog") return "Open";
-  if (s === "retest" || s === "ready for qa") return "Retest";
+  if (s === "closed") return "Closed";
+  if (s === "completed" || s === "deployed") return "Closed";
+  if (s === "in review" || s === "in development" || s === "in design") return "In Progress";
+  if (s === "testing" || s === "ready for deployment") return "Retest";
+  if (s === "backlog" || s === "scoping" || s === "ready for development") return "Open";
+  if (s === "on hold") return "Open";
   return null;
 }
 
