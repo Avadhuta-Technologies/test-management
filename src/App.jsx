@@ -516,7 +516,7 @@ function CasesTable({ project, onUpdate }) {
         <Modal title="Add Test Case" onClose={()=>setShowAdd(false)}>
           <Field label="Title"><Inp value={addForm.title} onChange={e=>setAddForm({...addForm,title:e.target.value})} placeholder="Test case title"/></Field>
           <Field label="Module"><Sel options={config.modules} value={addForm.module} onChange={e=>setAddForm({...addForm,module:e.target.value})}/></Field>
-          <Field label="User Story"><Sel options={config.stories} value={addForm.story} onChange={e=>setAddForm({...addForm,story:e.target.value})}/></Field>
+          {/* <Field label="User Story"><Sel options={config.stories} value={addForm.story} onChange={e=>setAddForm({...addForm,story:e.target.value})}/></Field> */}
           <Field label="Sprint"><Sel options={config.sprints} value={addForm.sprint} onChange={e=>setAddForm({...addForm,sprint:e.target.value})}/></Field>
           <Field label="Status"><Sel options={STATUSES} value={addForm.status} onChange={e=>setAddForm({...addForm,status:e.target.value})}/></Field>
           <Field label="Assignee"><Inp value={addForm.assignee} onChange={e=>setAddForm({...addForm,assignee:e.target.value})}/></Field>
@@ -658,7 +658,7 @@ function SettingsPanel({ project, onUpdate }) {
   const [vals, setVals] = useState({modules:"",sprints:"",stories:"",devs:"",releases:""});
   const [rd, setRd] = useState(releaseDate||"");
   const [confirmDel, setConfirmDel] = useState(null);
-  const sections = [{key:"modules",label:"Modules",icon:"📦",hint:"e.g. Checkout"},{key:"sprints",label:"Sprints",icon:"🏃",hint:"e.g. Sprint 5"},{key:"stories",label:"User Stories",icon:"📖",hint:"e.g. US-006"},{key:"devs",label:"Dev Engineers",icon:"👨‍💻",hint:"e.g. Dev - Priya"},{key:"releases",label:"Releases",icon:"🚀",hint:"e.g. R3 - May 1"}];
+  const sections = [{key:"modules",label:"Modules",icon:"📦",hint:"e.g. Checkout"},{key:"sprints",label:"Sprints",icon:"🏃",hint:"e.g. Sprint 5"},{key:"devs",label:"Dev Engineers",icon:"👨‍💻",hint:"e.g. Dev - Priya"},{key:"releases",label:"Releases",icon:"🚀",hint:"e.g. R3 - May 1"}];
   const add = (key) => { const v=vals[key].trim(); if(!v||config[key].includes(v))return; onUpdate({...project,config:{...config,[key]:[...config[key],v]}}); setVals(n=>({...n,[key]:""})); };
   const remove = (key,val) => { onUpdate({...project,config:{...config,[key]:config[key].filter(x=>x!==val)}}); setConfirmDel(null); };
   return (

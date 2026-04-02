@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { Project, TestCase, Bug } from "./types";
+import type { Project, TestCase, Bug, ClickUpConfig } from "./types";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -20,11 +20,11 @@ function rowToProject(p: any, cfg: any, cases: any[], bugs: any[]): Project {
 }
 
 function rowToCase(r: any): TestCase {
-  return { id: r.id, title: r.title, module: r.module, story: r.story, sprint: r.sprint, status: r.status, assignee: r.assignee, date: r.date, description: r.description ?? "", attachmentUrl: r.attachment_url ?? "" };
+  return { id: r.id, title: r.title, module: r.module, story: r.story, sprint: r.sprint, status: r.status, assignee: r.assignee, date: r.date, description: r.description ?? "", attachmentUrl: r.attachment_url ?? "", clickupTaskId: r.clickup_task_id ?? undefined, clickupTaskUrl: r.clickup_task_url ?? undefined };
 }
 
 function rowToBug(r: any): Bug {
-  return { id: r.id, title: r.title, module: r.module, linkedTC: r.linked_tc, severity: r.severity, priority: r.priority, status: r.status, assignedDev: r.assigned_dev, reportedDate: r.reported_date, closedDate: r.closed_date ?? "", reopened: r.reopened ?? false, release: r.release, reportedBy: r.reported_by, description: r.description ?? "", attachmentUrl: r.attachment_url ?? "" };
+  return { id: r.id, title: r.title, module: r.module, linkedTC: r.linked_tc, severity: r.severity, priority: r.priority, status: r.status, assignedDev: r.assigned_dev, reportedDate: r.reported_date, closedDate: r.closed_date ?? "", reopened: r.reopened ?? false, release: r.release, reportedBy: r.reported_by, description: r.description ?? "", attachmentUrl: r.attachment_url ?? "", clickupTaskId: r.clickup_task_id ?? undefined, clickupTaskUrl: r.clickup_task_url ?? undefined };
 }
 
 // ── projects ───────────────────────────────────────────────────────────────
@@ -112,6 +112,8 @@ export async function updateTestCase(id: string, data: Partial<TestCase>): Promi
   if (data.date !== undefined) patch.date = data.date;
   if (data.description !== undefined) patch.description = data.description || null;
   if (data.attachmentUrl !== undefined) patch.attachment_url = data.attachmentUrl || null;
+  if (data.clickupTaskId !== undefined) patch.clickup_task_id = data.clickupTaskId || null;
+  if (data.clickupTaskUrl !== undefined) patch.clickup_task_url = data.clickupTaskUrl || null;
   const { error } = await supabase.from("test_cases").update(patch).eq("id", id);
   if (error) throw error;
 }
@@ -145,6 +147,35 @@ export async function updateBug(id: string, data: Partial<Bug>): Promise<void> {
   if (data.release !== undefined) patch.release = data.release;
   if (data.description !== undefined) patch.description = data.description || null;
   if (data.attachmentUrl !== undefined) patch.attachment_url = data.attachmentUrl || null;
+  if (data.clickupTaskId !== undefined) patch.clickup_task_id = data.clickupTaskId || null;
+  if (data.clickupTaskUrl !== undefined) patch.clickup_task_url = data.clickupTaskUrl || null;
   const { error } = await supabase.from("bugs").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+// ── clickup config ─────────────────────────────────────────────────────────
+
+export async function fetchClickUpConfig(projectId: string): Promise<ClickUpConfig | null> {
+  const { data, error } = await supabase.from("clickup_config").select("*").eq("project_id", projectId).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return { projectId: data.project_id, apiToken: data.api_token, teamId: data.team_id, teamName: data.team_name ?? "", listId: data.list_id, listName: data.list_name ?? "" };
+}
+
+export async function saveClickUpConfig(config: ClickUpConfig): Promise<void> {
+  const { error } = await supabase.from("clickup_config").upsert({
+    project_id: config.projectId,
+    api_token: config.apiToken,
+    team_id: config.teamId,
+    team_name: config.teamName,
+    list_id: config.listId,
+    list_name: config.listName,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "project_id" });
+  if (error) throw error;
+}
+
+export async function deleteClickUpConfig(projectId: string): Promise<void> {
+  const { error } = await supabase.from("clickup_config").delete().eq("project_id", projectId);
   if (error) throw error;
 }

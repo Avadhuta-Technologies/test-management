@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
-import type { Project, TestCase } from "../types";
-import { STATUSES } from "../types";
-import { addTestCase, updateTestCase, uploadAttachment } from "../db";
+import type { Bug, Project, TestCase, ClickUpConfig } from "../types";
+import { BUG_STATUSES, PRIORITIES, SEVERITIES, STATUSES } from "../types";
+import { addBug, addTestCase, updateTestCase, uploadAttachment } from "../db";
+import { fetchTask, parseTaskId } from "../clickup";
+import type { ClickUpTask } from "../clickup";
 import { Badge, Field, Inp, Modal, Sel, SmallSel } from "./ui";
 
-type CasesTableProps = { project: Project; onUpdate: (project: Project) => void };
+type CasesTableProps = { project: Project; onUpdate: (project: Project) => void; clickUpConfig: ClickUpConfig | null };
 type SortDir = "asc" | "desc";
 
 function AttachmentLink({ url }: { url?: string }) {
@@ -13,7 +15,22 @@ function AttachmentLink({ url }: { url?: string }) {
   return <a href={url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-indigo-500 hover:underline truncate max-w-[120px] block">📎 {name}</a>;
 }
 
-export function CasesTable({ project, onUpdate }: CasesTableProps) {
+function ClickUpTaskPreview({ task }: { task: ClickUpTask }) {
+  return (
+    <div className="mt-1 p-2 bg-purple-50 rounded-lg border border-purple-100 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-semibold text-purple-800 truncate">{task.name}</span>
+        <a href={task.url} target="_blank" rel="noreferrer" className="text-purple-600 hover:underline shrink-0">Open ↗</a>
+      </div>
+      <div className="flex gap-3 mt-1 text-gray-500">
+        <span>Status: <span className="font-semibold text-gray-700">{task.status.status}</span></span>
+        {task.assignees.length > 0 && <span>Assignee: <span className="font-semibold text-gray-700">{task.assignees[0].username}</span></span>}
+      </div>
+    </div>
+  );
+}
+
+export function CasesTable({ project, onUpdate, clickUpConfig }: CasesTableProps) {
   const { cases, config } = project;
   const [search, setSearch] = useState("");
   const [fMod, setFMod] = useState("All");
@@ -24,6 +41,8 @@ export function CasesTable({ project, onUpdate }: CasesTableProps) {
   const [editId, setEditId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [logBugForTC, setLogBugForTC] = useState<string | null>(null);
+  const [bugForm, setBugForm] = useState<Omit<Bug, "id"> | null>(null);
   const today = new Date().toISOString().split("T")[0];
 
   const blank: Omit<TestCase, "id"> = {
@@ -35,6 +54,12 @@ export function CasesTable({ project, onUpdate }: CasesTableProps) {
 
   // edit drawer state
   const [editForm, setEditForm] = useState<TestCase | null>(null);
+
+  // ClickUp task link state (edit drawer)
+  const [cuInput, setCuInput] = useState("");
+  const [cuTask, setCuTask] = useState<ClickUpTask | null>(null);
+  const [cuFetching, setCuFetching] = useState(false);
+  const [cuError, setCuError] = useState("");
 
   const toggleSort = (key: keyof TestCase) => {
     setSortDir(sortKey === key ? (sortDir === "asc" ? "desc" : "asc") : "asc");
@@ -84,14 +109,78 @@ export function CasesTable({ project, onUpdate }: CasesTableProps) {
 
   const saveEdit = async () => {
     if (!editForm) return;
-    await updateTestCase(editForm.id, editForm);
-    onUpdate({ ...project, cases: cases.map((c) => (c.id === editForm.id ? editForm : c)) });
+    // Persist ClickUp task link if one was fetched
+    const toSave: TestCase = cuTask
+      ? { ...editForm, clickupTaskId: cuTask.id, clickupTaskUrl: cuTask.url }
+      : editForm;
+    await updateTestCase(toSave.id, toSave);
+    onUpdate({ ...project, cases: cases.map((c) => (c.id === toSave.id ? toSave : c)) });
     setEditId(null);
     setEditForm(null);
+    setCuTask(null);
+    setCuInput("");
+    setCuError("");
   };
 
-  const openEdit = (item: TestCase) => { setEditId(item.id); setEditForm({ ...item }); };
-  const closeEdit = () => { setEditId(null); setEditForm(null); };
+  const openEdit = (item: TestCase) => {
+    setEditId(item.id);
+    setEditForm({ ...item });
+    setCuTask(null);
+    setCuInput(item.clickupTaskId ? (item.clickupTaskUrl ?? item.clickupTaskId) : "");
+    setCuError("");
+  };
+  const closeEdit = () => { setEditId(null); setEditForm(null); setCuTask(null); setCuInput(""); setCuError(""); };
+
+  // Fetch ClickUp task preview when user pastes a URL/ID
+  const lookupCuTask = async (input: string) => {
+    setCuInput(input);
+    setCuTask(null);
+    setCuError("");
+    if (!input.trim() || !clickUpConfig) return;
+    const taskId = parseTaskId(input.trim());
+    if (!taskId) return;
+    setCuFetching(true);
+    try {
+      const task = await fetchTask(clickUpConfig.apiToken, taskId);
+      setCuTask(task);
+    } catch (e: any) {
+      setCuError("Could not fetch task. Check the URL or ID.");
+    } finally {
+      setCuFetching(false);
+    }
+  };
+
+  const clearCuLink = () => {
+    setCuInput("");
+    setCuTask(null);
+    setCuError("");
+    if (editForm) setEditForm({ ...editForm, clickupTaskId: undefined, clickupTaskUrl: undefined });
+  };
+
+  const bugCountByTC = useMemo(() => {
+    const map: Record<string, number> = {};
+    project.bugs.forEach((b) => { if (b.linkedTC) map[b.linkedTC] = (map[b.linkedTC] ?? 0) + 1; });
+    return map;
+  }, [project.bugs]);
+
+  const openLogBug = (tcId: string) => {
+    setLogBugForTC(tcId);
+    setBugForm({
+      title: "", module: config.modules[0] ?? "", linkedTC: tcId,
+      severity: "Major", priority: "P3 - Medium", status: "Open",
+      assignedDev: config.devs[0] ?? "", reportedDate: today, closedDate: "",
+      reopened: false, release: config.releases[0] ?? "", description: "", attachmentUrl: "",
+    });
+  };
+
+  const closeLogBug = () => { setLogBugForTC(null); setBugForm(null); };
+
+  const saveLogBug = async () => {
+    if (!bugForm?.title.trim()) return;
+    const created = await addBug(project.id, bugForm);
+    onUpdate({ ...project, bugs: [...project.bugs, created] });
+    closeLogBug();
+  };
 
   return (
     <div>
@@ -139,7 +228,29 @@ export function CasesTable({ project, onUpdate }: CasesTableProps) {
                   <td className="px-3 py-2 text-gray-700">{item.assignee}</td>
                   <td className="px-3 py-2 text-gray-600">{item.date}</td>
                   <td className="px-3 py-2"><AttachmentLink url={item.attachmentUrl} /></td>
-                  <td className="px-3 py-2 text-indigo-400 text-xs">✏️ edit</td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-indigo-400 text-xs">✏️ edit</span>
+                      {item.clickupTaskId && (
+                        <a
+                          href={item.clickupTaskUrl ?? `https://app.clickup.com/t/${item.clickupTaskId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-xs font-semibold px-2 py-0.5 rounded-full hover:bg-purple-100"
+                          title="View in ClickUp"
+                        >
+                          🔗 CU
+                        </a>
+                      )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openLogBug(item.id); }}
+                        className="text-xs bg-red-50 text-red-500 font-semibold px-2 py-0.5 rounded-full hover:bg-red-100"
+                      >
+                        🐛 {bugCountByTC[item.id] ? `${bugCountByTC[item.id]} bug${bugCountByTC[item.id] > 1 ? "s" : ""}` : "Log Bug"}
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               )
             )}
@@ -155,7 +266,7 @@ export function CasesTable({ project, onUpdate }: CasesTableProps) {
         <Modal title="Add Test Case" onClose={() => setShowAdd(false)}>
           <Field label="Title"><Inp value={addForm.title} onChange={(e) => setAddForm({ ...addForm, title: e.target.value })} placeholder="Test case title" /></Field>
           <Field label="Module"><Sel options={config.modules} value={addForm.module} onChange={(e) => setAddForm({ ...addForm, module: e.target.value })} /></Field>
-          <Field label="User Story"><Sel options={config.stories} value={addForm.story} onChange={(e) => setAddForm({ ...addForm, story: e.target.value })} /></Field>
+          {/* <Field label="User Story"><Sel options={config.stories} value={addForm.story} onChange={(e) => setAddForm({ ...addForm, story: e.target.value })} /></Field> */}
           <Field label="Sprint"><Sel options={config.sprints} value={addForm.sprint} onChange={(e) => setAddForm({ ...addForm, sprint: e.target.value })} /></Field>
           <Field label="Status"><Sel options={STATUSES} value={addForm.status} onChange={(e) => setAddForm({ ...addForm, status: e.target.value as typeof addForm.status })} /></Field>
           <Field label="Assignee"><Inp value={addForm.assignee} onChange={(e) => setAddForm({ ...addForm, assignee: e.target.value })} /></Field>
@@ -189,12 +300,40 @@ export function CasesTable({ project, onUpdate }: CasesTableProps) {
         </Modal>
       )}
 
+      {/* Log Bug drawer */}
+      {logBugForTC && bugForm && (
+        <Modal title={`Log Bug for ${logBugForTC}`} onClose={closeLogBug}>
+          <Field label="Title"><Inp value={bugForm.title} onChange={(e) => setBugForm({ ...bugForm, title: e.target.value })} placeholder="Describe the bug" /></Field>
+          <Field label="Linked TC"><Inp value={bugForm.linkedTC} readOnly className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500" /></Field>
+          <Field label="Module"><Sel options={config.modules} value={bugForm.module} onChange={(e) => setBugForm({ ...bugForm, module: e.target.value })} /></Field>
+          <Field label="Severity"><Sel options={SEVERITIES} value={bugForm.severity} onChange={(e) => setBugForm({ ...bugForm, severity: e.target.value as Bug["severity"] })} /></Field>
+          <Field label="Priority"><Sel options={PRIORITIES} value={bugForm.priority} onChange={(e) => setBugForm({ ...bugForm, priority: e.target.value as Bug["priority"] })} /></Field>
+          <Field label="Status"><Sel options={BUG_STATUSES} value={bugForm.status} onChange={(e) => setBugForm({ ...bugForm, status: e.target.value as Bug["status"] })} /></Field>
+          <Field label="Assigned Dev"><Sel options={config.devs} value={bugForm.assignedDev} onChange={(e) => setBugForm({ ...bugForm, assignedDev: e.target.value })} /></Field>
+          <Field label="Release"><Sel options={config.releases} value={bugForm.release} onChange={(e) => setBugForm({ ...bugForm, release: e.target.value })} /></Field>
+          <Field label="Reported Date"><Inp type="date" value={bugForm.reportedDate} onChange={(e) => setBugForm({ ...bugForm, reportedDate: e.target.value })} onKeyDown={(e) => e.preventDefault()} /></Field>
+          <Field label="Description">
+            <textarea
+              value={bugForm.description ?? ""}
+              onChange={(e) => setBugForm({ ...bugForm, description: e.target.value })}
+              rows={3}
+              placeholder="Steps to reproduce, environment, expected vs actual…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+            />
+          </Field>
+          <div className="flex gap-2 mt-4">
+            <button onClick={saveLogBug} className="flex-1 bg-red-500 text-white font-semibold py-2 rounded-lg">Log Bug</button>
+            <button onClick={closeLogBug} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2 rounded-lg">Cancel</button>
+          </div>
+        </Modal>
+      )}
+
       {/* Edit drawer */}
       {editForm && (
         <Modal title={`Edit ${editForm.id}`} onClose={closeEdit}>
           <Field label="Title"><Inp value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} /></Field>
           <Field label="Module"><Sel options={config.modules} value={editForm.module} onChange={(e) => setEditForm({ ...editForm, module: e.target.value })} /></Field>
-          <Field label="User Story"><Sel options={config.stories} value={editForm.story} onChange={(e) => setEditForm({ ...editForm, story: e.target.value })} /></Field>
+          {/* <Field label="User Story"><Sel options={config.stories} value={editForm.story} onChange={(e) => setEditForm({ ...editForm, story: e.target.value })} /></Field> */}
           <Field label="Sprint"><Sel options={config.sprints} value={editForm.sprint} onChange={(e) => setEditForm({ ...editForm, sprint: e.target.value })} /></Field>
           <Field label="Status"><Sel options={STATUSES} value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value as typeof editForm.status })} /></Field>
           <Field label="Assignee"><Inp value={editForm.assignee} onChange={(e) => setEditForm({ ...editForm, assignee: e.target.value })} /></Field>
@@ -221,6 +360,28 @@ export function CasesTable({ project, onUpdate }: CasesTableProps) {
               </label>
             )}
           </Field>
+
+          {/* ClickUp Task Link (Phase 3c) */}
+          {clickUpConfig && (
+            <Field label="ClickUp Task (paste URL or task ID)">
+              <div className="flex gap-2">
+                <input
+                  value={cuInput}
+                  onChange={(e) => lookupCuTask(e.target.value)}
+                  placeholder="https://app.clickup.com/t/abc123 or abc123"
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-300"
+                />
+                {cuInput && <button onClick={clearCuLink} className="text-xs text-red-400 hover:text-red-600 px-1">✕</button>}
+              </div>
+              {cuFetching && <p className="text-xs text-gray-400 mt-1">Fetching task…</p>}
+              {cuError && <p className="text-xs text-red-500 mt-1">{cuError}</p>}
+              {cuTask && <ClickUpTaskPreview task={cuTask} />}
+              {!cuTask && editForm.clickupTaskId && !cuFetching && (
+                <p className="text-xs text-purple-600 mt-1">Currently linked: {editForm.clickupTaskId}</p>
+              )}
+            </Field>
+          )}
+
           <div className="flex gap-2 mt-4">
             <button onClick={saveEdit} disabled={uploading} className="flex-1 bg-indigo-600 text-white font-semibold py-2 rounded-lg disabled:opacity-50">Save</button>
             <button onClick={closeEdit} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2 rounded-lg">Cancel</button>

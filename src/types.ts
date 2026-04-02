@@ -40,6 +40,8 @@ export interface TestCase {
   date: string;
   description?: string;
   attachmentUrl?: string;
+  clickupTaskId?: string;
+  clickupTaskUrl?: string;
 }
 
 export interface Bug {
@@ -58,6 +60,17 @@ export interface Bug {
   reportedBy?: string;
   description?: string;
   attachmentUrl?: string;
+  clickupTaskId?: string;
+  clickupTaskUrl?: string;
+}
+
+export interface ClickUpConfig {
+  projectId: string;
+  apiToken: string;
+  teamId: string;
+  teamName: string;
+  listId: string;
+  listName: string;
 }
 
 export interface Project {
