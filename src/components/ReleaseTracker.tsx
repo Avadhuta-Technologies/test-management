@@ -83,9 +83,9 @@ export function ReleaseTracker({ project }: ReleaseTrackerProps) {
       <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 mb-4">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <div>
-            <p className="text-xs text-gray-400 font-medium">Target Release Date</p>
+            <p className="text-xs text-gray-600 font-medium">Target Release Date</p>
             <p className="text-xl font-bold text-gray-800">
-              {releaseDate} <span className="text-sm font-normal text-gray-400">({daysLeft} days left)</span>
+              {releaseDate} <span className="text-sm font-normal text-gray-600">({daysLeft} days left)</span>
             </p>
           </div>
           <span className={`text-sm font-bold px-4 py-2 rounded-xl ${onTrack ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
@@ -94,7 +94,7 @@ export function ReleaseTracker({ project }: ReleaseTrackerProps) {
         </div>
 
         <div className="mb-3">
-          <div className="flex justify-between text-xs text-gray-500 mb-1">
+          <div className="flex justify-between text-xs text-gray-600 mb-1">
             <span>⏱ Time Elapsed</span>
             <span>{timeProgress}%</span>
           </div>
@@ -104,7 +104,7 @@ export function ReleaseTracker({ project }: ReleaseTrackerProps) {
         </div>
 
         <div className="mb-1">
-          <div className="flex justify-between text-xs text-gray-500 mb-1">
+          <div className="flex justify-between text-xs text-gray-600 mb-1">
             <span>✅ Test Execution</span>
             <span>{execPct}%</span>
           </div>
@@ -121,12 +121,12 @@ export function ReleaseTracker({ project }: ReleaseTrackerProps) {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-4 mt-3 text-xs text-gray-500">
+        <div className="flex flex-wrap gap-4 mt-3 text-xs text-gray-600">
           <span>📋 {total} total</span>
           <span className="text-green-600 font-semibold">✓ {passed} passed</span>
           <span className="text-red-500 font-semibold">✗ {cases.filter((c) => c.status === "Fail").length} failed</span>
           <span className="text-orange-500 font-semibold">⊘ {cases.filter((c) => c.status === "Blocked").length} blocked</span>
-          <span className="text-gray-400">— {cases.filter((c) => c.status === "Not Run").length} not run</span>
+          <span className="text-gray-600">— {cases.filter((c) => c.status === "Not Run").length} not run</span>
         </div>
       </div>
 
@@ -203,7 +203,7 @@ export function ReleaseTracker({ project }: ReleaseTrackerProps) {
               <div>
                 <p className="text-xs text-gray-600 font-semibold">{metric.label}</p>
                 <p className={`text-base font-bold ${metric.ok ? "text-green-700" : "text-red-700"}`}>{metric.val}</p>
-                <p className="text-xs text-gray-400">Target: {metric.t}</p>
+                <p className="text-xs text-gray-600">Target: {metric.t}</p>
               </div>
             </div>
           ))}

@@ -48,22 +48,22 @@ export function PortfolioView({ projects }: PortfolioViewProps) {
             </div>
             <div className="grid grid-cols-3 gap-2 text-center mb-3">
               <div>
-                <p className="text-xs text-gray-400">Cases</p>
-                <p className="font-bold text-gray-700">{item.total}</p>
+                <p className="text-xs text-gray-600">Cases</p>
+                <p className="font-bold text-gray-800">{item.total}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-400">Pass Rate</p>
+                <p className="text-xs text-gray-600">Pass Rate</p>
                 <p className={`font-bold ${item.passRate >= 80 ? "text-green-600" : "text-red-600"}`}>{item.passRate}%</p>
               </div>
               <div>
-                <p className="text-xs text-gray-400">Open Bugs</p>
+                <p className="text-xs text-gray-600">Open Bugs</p>
                 <p className={`font-bold ${item.openBugs > 0 ? "text-red-600" : "text-green-600"}`}>{item.openBugs}</p>
               </div>
             </div>
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
               <div className="h-2 rounded-full" style={{ width: `${item.total ? Math.round((item.executed / item.total) * 100) : 0}%`, background: item.color }} />
             </div>
-            <p className="text-xs text-gray-400 mt-1">{item.total ? Math.round((item.executed / item.total) * 100) : 0}% executed</p>
+            <p className="text-xs text-gray-600 mt-1">{item.total ? Math.round((item.executed / item.total) * 100) : 0}% executed</p>
           </div>
         ))}
       </div>

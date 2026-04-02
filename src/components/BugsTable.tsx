@@ -8,7 +8,7 @@ type BugsTableProps = { project: Project; onUpdate: (project: Project) => void }
 type SortDir = "asc" | "desc";
 
 function AttachmentLink({ url }: { url?: string }) {
-  if (!url) return <span className="text-gray-300">—</span>;
+  if (!url) return <span className="text-gray-500">—</span>;
   const name = url.split("/").pop() ?? "file";
   return <a href={url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-indigo-500 hover:underline truncate max-w-[120px] block">📎 {name}</a>;
 }
@@ -41,7 +41,7 @@ export function BugsTable({ project, onUpdate }: BugsTableProps) {
 
   const SortTh = ({ k, label }: { k: keyof Bug; label: string }) => (
     <th onClick={() => toggleSort(k)} className="px-3 py-2 text-left cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">
-      {label} <span className="text-gray-400">{sortKey === k ? (sortDir === "asc" ? "↑" : "↓") : "↕"}</span>
+      {label} <span className="text-gray-500">{sortKey === k ? (sortDir === "asc" ? "↑" : "↓") : "↕"}</span>
     </th>
   );
 
@@ -113,7 +113,7 @@ export function BugsTable({ project, onUpdate }: BugsTableProps) {
           <button onClick={onClear} className="text-xs text-red-400 hover:text-red-600">✕</button>
         </div>
       ) : (
-        <label className={`flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-500 cursor-pointer hover:border-indigo-400 hover:text-indigo-500 transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
+        <label className={`flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-600 cursor-pointer hover:border-indigo-400 hover:text-indigo-500 transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
           {uploading ? "Uploading…" : "📎 Click to attach a file"}
           <input type="file" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0], target)} />
         </label>
@@ -132,7 +132,7 @@ export function BugsTable({ project, onUpdate }: BugsTableProps) {
         {(search || fMod !== "All" || fSt !== "All" || fSev !== "All" || fDev !== "All") && (
           <button onClick={() => { setSearch(""); setFMod("All"); setFSt("All"); setFSev("All"); setFDev("All"); }} className="text-xs text-indigo-500 font-semibold hover:underline">Clear</button>
         )}
-        <span className="text-xs text-gray-400">{filtered.length} of {bugs.length}</span>
+        <span className="text-xs text-gray-600">{filtered.length} of {bugs.length}</span>
         <button onClick={() => setShowAdd(true)} className="ml-auto bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">+ Log Bug</button>
       </div>
 
@@ -156,24 +156,24 @@ export function BugsTable({ project, onUpdate }: BugsTableProps) {
           <tbody>
             {filtered.map((item) => (
               <tr key={item.id} onClick={() => setEditForm({ ...item })} className="border-t hover:bg-red-50 cursor-pointer transition-colors">
-                <td className="px-3 py-2 font-mono text-gray-400">{item.id}</td>
+                <td className="px-3 py-2 font-mono text-gray-600">{item.id}</td>
                 <td className="px-3 py-2 text-gray-800 max-w-xs">
                   <div className="truncate">{item.title}</div>
-                  {item.description && <div className="text-gray-400 truncate mt-0.5">{item.description}</div>}
+                  {item.description && <div className="text-gray-600 truncate mt-0.5">{item.description}</div>}
                 </td>
                 <td className="px-3 py-2"><Badge text={item.module} /></td>
-                <td className="px-3 py-2 font-mono text-gray-400">{item.linkedTC}</td>
+                <td className="px-3 py-2 font-mono text-gray-600">{item.linkedTC}</td>
                 <td className="px-3 py-2"><Badge text={item.severity} /></td>
                 <td className="px-3 py-2"><Badge text={item.priority} /></td>
                 <td className="px-3 py-2"><Badge text={item.status} /></td>
-                <td className="px-3 py-2 text-gray-500">{item.assignedDev.replace("Dev - ", "")}</td>
-                <td className="px-3 py-2 text-gray-400">{item.reportedDate}</td>
+                <td className="px-3 py-2 text-gray-700">{item.assignedDev.replace("Dev - ", "")}</td>
+                <td className="px-3 py-2 text-gray-600">{item.reportedDate}</td>
                 <td className="px-3 py-2"><AttachmentLink url={item.attachmentUrl} /></td>
                 <td className="px-3 py-2 text-indigo-400 text-xs">✏️ edit</td>
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={11} className="text-center py-8 text-gray-400">No bugs match your filters.</td></tr>
+              <tr><td colSpan={11} className="text-center py-8 text-gray-600">No bugs match your filters.</td></tr>
             )}
           </tbody>
         </table>

@@ -91,7 +91,7 @@ export function KPIPanel({ project }: KPIPanelProps) {
     <div>
       <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 mb-4 flex flex-wrap gap-3 items-end">
         <div>
-          <p className="text-xs font-semibold text-gray-500 mb-1">👤 Person</p>
+          <p className="text-xs font-semibold text-gray-700 mb-1">👤 Person</p>
           <select value={person} onChange={(event) => setPerson(event.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
             {allPeople.map((p) => (
               <option key={p} value={p}>
@@ -101,11 +101,11 @@ export function KPIPanel({ project }: KPIPanelProps) {
           </select>
         </div>
         <div>
-          <p className="text-xs font-semibold text-gray-500 mb-1">📅 From</p>
+          <p className="text-xs font-semibold text-gray-700 mb-1">📅 From</p>
           <Inp type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} style={{ width: 140 }} />
         </div>
         <div>
-          <p className="text-xs font-semibold text-gray-500 mb-1">📅 To</p>
+          <p className="text-xs font-semibold text-gray-700 mb-1">📅 To</p>
           <Inp type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} style={{ width: 140 }} />
         </div>
         {(person !== "All" || dateFrom || dateTo) && (

@@ -28,7 +28,7 @@ export default function App() {
   if (auth.status === "loading") {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-400 text-sm animate-pulse">Checking auth…</div>
+        <div className="text-gray-600 text-sm animate-pulse">Checking auth…</div>
       </div>
     );
   }
@@ -42,7 +42,7 @@ export default function App() {
           </div>
           <div className="text-center">
             <h1 className="text-xl font-bold text-gray-800">QualifyMe</h1>
-            <p className="text-sm text-gray-400 mt-1">Sign in with your GitHub account</p>
+            <p className="text-sm text-gray-600 mt-1">Sign in with your GitHub account</p>
           </div>
           <button
             onClick={signInWithGitHub}
@@ -53,7 +53,7 @@ export default function App() {
             </svg>
             Continue with GitHub
           </button>
-          <p className="text-xs text-gray-400">Access restricted to Avadhuta Technologies members</p>
+          <p className="text-xs text-gray-600">Access restricted to Avadhuta Technologies members</p>
         </div>
       </div>
     );
@@ -65,7 +65,7 @@ export default function App() {
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-10 flex flex-col items-center gap-4 w-full max-w-sm text-center">
           <span className="text-4xl">🚫</span>
           <h2 className="text-lg font-bold text-gray-800">Access Denied</h2>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-700">
             <strong>{auth.login}</strong> is not a member of the <strong>Avadhuta-Technologies</strong> GitHub organisation.
           </p>
           <button onClick={signOut} className="mt-2 text-sm text-indigo-600 hover:underline">Sign out</button>
@@ -99,7 +99,7 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-400 text-sm animate-pulse">Loading projects…</div>
+        <div className="text-gray-600 text-sm animate-pulse">Loading projects…</div>
       </div>
     );
   }
@@ -149,7 +149,7 @@ export default function App() {
           >
             <span className="w-2 h-2 rounded-full" style={{ background: project.color }} />
             {project.name}
-            <span className="ml-1 bg-gray-100 text-gray-500 text-xs px-1.5 py-0.5 rounded-full">{project.cases.length}tc</span>
+            <span className="ml-1 bg-gray-100 text-gray-700 text-xs px-1.5 py-0.5 rounded-full">{project.cases.length}tc</span>
           </button>
         ))}
       </div>

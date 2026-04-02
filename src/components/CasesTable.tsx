@@ -8,7 +8,7 @@ type CasesTableProps = { project: Project; onUpdate: (project: Project) => void 
 type SortDir = "asc" | "desc";
 
 function AttachmentLink({ url }: { url?: string }) {
-  if (!url) return <span className="text-gray-300">—</span>;
+  if (!url) return <span className="text-gray-500">—</span>;
   const name = url.split("/").pop() ?? "file";
   return <a href={url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-indigo-500 hover:underline truncate max-w-[120px] block">📎 {name}</a>;
 }
@@ -43,7 +43,7 @@ export function CasesTable({ project, onUpdate }: CasesTableProps) {
 
   const SortTh = ({ k, label }: { k: keyof TestCase; label: string }) => (
     <th onClick={() => toggleSort(k)} className="px-3 py-2 text-left cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap">
-      {label} <span className="text-gray-400">{sortKey === k ? (sortDir === "asc" ? "↑" : "↓") : "↕"}</span>
+      {label} <span className="text-gray-500">{sortKey === k ? (sortDir === "asc" ? "↑" : "↓") : "↕"}</span>
     </th>
   );
 
@@ -103,7 +103,7 @@ export function CasesTable({ project, onUpdate }: CasesTableProps) {
         {(search || fMod !== "All" || fSt !== "All" || fSprint !== "All") && (
           <button onClick={() => { setSearch(""); setFMod("All"); setFSt("All"); setFSprint("All"); }} className="text-xs text-indigo-500 font-semibold hover:underline">Clear</button>
         )}
-        <span className="text-xs text-gray-400">{filtered.length} of {cases.length}</span>
+        <span className="text-xs text-gray-600">{filtered.length} of {cases.length}</span>
         <button onClick={() => setShowAdd(true)} className="ml-auto bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">+ Add</button>
       </div>
 
@@ -127,24 +127,24 @@ export function CasesTable({ project, onUpdate }: CasesTableProps) {
             {filtered.map((item) =>
               editId === item.id ? null : (
                 <tr key={item.id} onClick={() => openEdit(item)} className="border-t hover:bg-indigo-50 cursor-pointer transition-colors">
-                  <td className="px-3 py-2 font-mono text-gray-400">{item.id}</td>
+                  <td className="px-3 py-2 font-mono text-gray-600">{item.id}</td>
                   <td className="px-3 py-2 text-gray-800 max-w-xs">
                     <div className="truncate">{item.title}</div>
-                    {item.description && <div className="text-gray-400 truncate mt-0.5">{item.description}</div>}
+                    {item.description && <div className="text-gray-600 truncate mt-0.5">{item.description}</div>}
                   </td>
                   <td className="px-3 py-2"><Badge text={item.module} /></td>
-                  <td className="px-3 py-2 text-gray-500">{item.sprint}</td>
-                  <td className="px-3 py-2 text-gray-400">{item.story}</td>
+                  <td className="px-3 py-2 text-gray-700">{item.sprint}</td>
+                  <td className="px-3 py-2 text-gray-600">{item.story}</td>
                   <td className="px-3 py-2"><Badge text={item.status} /></td>
-                  <td className="px-3 py-2 text-gray-500">{item.assignee}</td>
-                  <td className="px-3 py-2 text-gray-400">{item.date}</td>
+                  <td className="px-3 py-2 text-gray-700">{item.assignee}</td>
+                  <td className="px-3 py-2 text-gray-600">{item.date}</td>
                   <td className="px-3 py-2"><AttachmentLink url={item.attachmentUrl} /></td>
                   <td className="px-3 py-2 text-indigo-400 text-xs">✏️ edit</td>
                 </tr>
               )
             )}
             {filtered.length === 0 && (
-              <tr><td colSpan={10} className="text-center py-8 text-gray-400">No test cases match your filters.</td></tr>
+              <tr><td colSpan={10} className="text-center py-8 text-gray-600">No test cases match your filters.</td></tr>
             )}
           </tbody>
         </table>
@@ -176,7 +176,7 @@ export function CasesTable({ project, onUpdate }: CasesTableProps) {
                 <button onClick={() => setAddForm({ ...addForm, attachmentUrl: "" })} className="text-xs text-red-400 hover:text-red-600">✕</button>
               </div>
             ) : (
-              <label className={`flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-500 cursor-pointer hover:border-indigo-400 hover:text-indigo-500 transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
+              <label className={`flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-600 cursor-pointer hover:border-indigo-400 hover:text-indigo-500 transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
                 {uploading ? "Uploading…" : "📎 Click to attach a file"}
                 <input type="file" className="hidden" onChange={(e) => e.target.files?.[0] && handleAddFile(e.target.files[0])} />
               </label>
@@ -215,7 +215,7 @@ export function CasesTable({ project, onUpdate }: CasesTableProps) {
                 <button onClick={() => setEditForm({ ...editForm, attachmentUrl: "" })} className="text-xs text-red-400 hover:text-red-600">✕</button>
               </div>
             ) : (
-              <label className={`flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-500 cursor-pointer hover:border-indigo-400 hover:text-indigo-500 transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
+              <label className={`flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-600 cursor-pointer hover:border-indigo-400 hover:text-indigo-500 transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
                 {uploading ? "Uploading…" : "📎 Click to attach a file"}
                 <input type="file" className="hidden" onChange={(e) => e.target.files?.[0] && handleEditFile(e.target.files[0])} />
               </label>
