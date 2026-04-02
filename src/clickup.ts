@@ -110,7 +110,6 @@ export async function createClickUpTask(token: string, listId: string, bug: Bug 
     name: ("id" in bug ? `[${bug.id}] ` : "") + bug.title,
     description: bugToTaskBody(bug),
     priority: PRIORITY_MAP[bug.priority] ?? 3,
-    status: "Open",
   };
   return req<ClickUpTask>(token, `/list/${listId}/task`, { method: "POST", body: JSON.stringify(body) });
 }
