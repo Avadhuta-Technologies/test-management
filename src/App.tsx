@@ -41,7 +41,7 @@ export default function App() {
             <span className="text-white text-xl font-bold">at</span>
           </div>
           <div className="text-center">
-            <h1 className="text-xl font-bold text-gray-800">Avadhuta Technologies</h1>
+            {/* <h1 className="text-xl font-bold text-gray-800">Avadhuta Technologies</h1> */}
             <p className="text-sm text-gray-600 mt-1">Sign in with your GitHub account</p>
           </div>
           <button
