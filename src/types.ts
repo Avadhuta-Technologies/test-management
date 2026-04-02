@@ -38,6 +38,8 @@ export interface TestCase {
   status: Status;
   assignee: string;
   date: string;
+  description?: string;
+  attachmentUrl?: string;
 }
 
 export interface Bug {
@@ -54,6 +56,8 @@ export interface Bug {
   reopened: boolean;
   release: string;
   reportedBy?: string;
+  description?: string;
+  attachmentUrl?: string;
 }
 
 export interface Project {

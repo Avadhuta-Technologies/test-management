@@ -1,12 +1,17 @@
 import { useMemo, useState } from "react";
-import type { Bug, EditField, Project } from "../types";
+import type { Bug, Project } from "../types";
 import { BUG_STATUSES, PRIORITIES, SEVERITIES } from "../types";
+import { addBug, updateBug, uploadAttachment } from "../db";
 import { Badge, Field, Inp, Modal, Sel, SmallSel } from "./ui";
-import { EditableRow } from "./EditableRow";
 
 type BugsTableProps = { project: Project; onUpdate: (project: Project) => void };
-
 type SortDir = "asc" | "desc";
+
+function AttachmentLink({ url }: { url?: string }) {
+  if (!url) return <span className="text-gray-300">—</span>;
+  const name = url.split("/").pop() ?? "file";
+  return <a href={url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-indigo-500 hover:underline truncate max-w-[120px] block">📎 {name}</a>;
+}
 
 export function BugsTable({ project, onUpdate }: BugsTableProps) {
   const { bugs, config } = project;
@@ -17,38 +22,17 @@ export function BugsTable({ project, onUpdate }: BugsTableProps) {
   const [fDev, setFDev] = useState("All");
   const [sortKey, setSortKey] = useState<keyof Bug>("id");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
-  const [editId, setEditId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [editForm, setEditForm] = useState<Bug | null>(null);
+  const [uploading, setUploading] = useState(false);
   const today = new Date().toISOString().split("T")[0];
 
   const blank: Omit<Bug, "id"> = {
-    title: "",
-    module: config.modules[0] ?? "",
-    linkedTC: "",
-    severity: "Major",
-    priority: "P3 - Medium",
-    status: "Open",
-    assignedDev: config.devs[0] ?? "",
-    reportedDate: today,
-    closedDate: "",
-    reopened: false,
-    release: config.releases[0] ?? "",
+    title: "", module: config.modules[0] ?? "", linkedTC: "", severity: "Major", priority: "P3 - Medium",
+    status: "Open", assignedDev: config.devs[0] ?? "", reportedDate: today, closedDate: "",
+    reopened: false, release: config.releases[0] ?? "", description: "", attachmentUrl: "",
   };
-
   const [addForm, setAddForm] = useState<Omit<Bug, "id">>(blank);
-
-  const bugFields: EditField[] = [
-    { key: "title", label: "Title" },
-    { key: "module", label: "Module", options: config.modules },
-    { key: "linkedTC", label: "Linked TC" },
-    { key: "severity", label: "Severity", options: SEVERITIES },
-    { key: "priority", label: "Priority", options: PRIORITIES },
-    { key: "status", label: "Status", options: BUG_STATUSES },
-    { key: "assignedDev", label: "Dev", options: config.devs },
-    { key: "release", label: "Release", options: config.releases },
-    { key: "reportedDate", label: "Reported", type: "date" },
-    { key: "closedDate", label: "Closed", type: "date" },
-  ];
 
   const toggleSort = (key: keyof Bug) => {
     setSortDir(sortKey === key ? (sortDir === "asc" ? "desc" : "asc") : "asc");
@@ -63,79 +47,93 @@ export function BugsTable({ project, onUpdate }: BugsTableProps) {
 
   const filtered = useMemo(() => {
     let rows = [...bugs];
-    if (search) {
-      const query = search.toLowerCase();
-      rows = rows.filter((bug) => bug.title.toLowerCase().includes(query) || bug.id.toLowerCase().includes(query));
-    }
-    if (fMod !== "All") rows = rows.filter((bug) => bug.module === fMod);
-    if (fSt !== "All") rows = rows.filter((bug) => bug.status === fSt);
-    if (fSev !== "All") rows = rows.filter((bug) => bug.severity === fSev);
-    if (fDev !== "All") rows = rows.filter((bug) => bug.assignedDev === fDev);
-    rows.sort((a, b) => {
-      const av = String(a[sortKey] ?? "");
-      const bv = String(b[sortKey] ?? "");
-      return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
-    });
+    if (search) { const q = search.toLowerCase(); rows = rows.filter((b) => b.title.toLowerCase().includes(q) || b.id.toLowerCase().includes(q)); }
+    if (fMod !== "All") rows = rows.filter((b) => b.module === fMod);
+    if (fSt !== "All") rows = rows.filter((b) => b.status === fSt);
+    if (fSev !== "All") rows = rows.filter((b) => b.severity === fSev);
+    if (fDev !== "All") rows = rows.filter((b) => b.assignedDev === fDev);
+    rows.sort((a, b) => { const av = String(a[sortKey] ?? ""), bv = String(b[sortKey] ?? ""); return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av); });
     return rows;
   }, [bugs, search, fMod, fSt, fSev, fDev, sortKey, sortDir]);
 
-  const saveEdit = (form: Record<string, any>) => {
-    if (!editId) return;
-    onUpdate({
-      ...project,
-      bugs: bugs.map((item) =>
-        item.id === editId
-          ? { ...item, ...form, id: editId, reopened: form.reopened === "true" || form.reopened === true }
-          : item,
-      ),
-    });
-    setEditId(null);
+  const handleFile = async (file: File, target: "add" | "edit") => {
+    setUploading(true);
+    try {
+      const url = await uploadAttachment(file, `bugs/${Date.now()}-${file.name}`);
+      if (target === "add") setAddForm((f) => ({ ...f, attachmentUrl: url }));
+      else setEditForm((f) => f ? { ...f, attachmentUrl: url } : f);
+    } finally { setUploading(false); }
   };
 
-  const saveAdd = () => {
+  const saveAdd = async () => {
     if (!addForm.title.trim()) return;
-    onUpdate({
-      ...project,
-      bugs: [
-        ...bugs,
-        { ...addForm, id: `BUG-${String(bugs.length + 1).padStart(3, "0")}` },
-      ],
-    });
+    const created = await addBug(project.id, addForm);
+    onUpdate({ ...project, bugs: [...bugs, created] });
     setAddForm(blank);
     setShowAdd(false);
   };
 
+  const saveEdit = async () => {
+    if (!editForm) return;
+    const patch: Partial<Bug> = { ...editForm, reopened: editForm.reopened };
+    await updateBug(editForm.id, patch);
+    onUpdate({ ...project, bugs: bugs.map((b) => (b.id === editForm.id ? editForm : b)) });
+    setEditForm(null);
+  };
+
+  const FormFields = ({ form, set }: { form: Omit<Bug, "id"> | Bug; set: (v: any) => void }) => (
+    <>
+      <Field label="Title"><Inp value={form.title} onChange={(e) => set({ ...form, title: e.target.value })} placeholder="Describe the bug" /></Field>
+      <Field label="Module"><Sel options={config.modules} value={form.module} onChange={(e) => set({ ...form, module: e.target.value })} /></Field>
+      <Field label="Linked TC"><Inp value={form.linkedTC} onChange={(e) => set({ ...form, linkedTC: e.target.value })} placeholder="e.g. TC-003" /></Field>
+      <Field label="Severity"><Sel options={SEVERITIES} value={form.severity} onChange={(e) => set({ ...form, severity: e.target.value as Bug["severity"] })} /></Field>
+      <Field label="Priority"><Sel options={PRIORITIES} value={form.priority} onChange={(e) => set({ ...form, priority: e.target.value as Bug["priority"] })} /></Field>
+      <Field label="Status"><Sel options={BUG_STATUSES} value={form.status} onChange={(e) => set({ ...form, status: e.target.value as Bug["status"] })} /></Field>
+      <Field label="Assigned Dev"><Sel options={config.devs} value={form.assignedDev} onChange={(e) => set({ ...form, assignedDev: e.target.value })} /></Field>
+      <Field label="Release"><Sel options={config.releases} value={form.release} onChange={(e) => set({ ...form, release: e.target.value })} /></Field>
+      <Field label="Reported Date"><Inp type="date" value={form.reportedDate} onChange={(e) => set({ ...form, reportedDate: e.target.value })} /></Field>
+      <Field label="Closed Date"><Inp type="date" value={form.closedDate ?? ""} onChange={(e) => set({ ...form, closedDate: e.target.value })} /></Field>
+      <Field label="Description">
+        <textarea
+          value={form.description ?? ""}
+          onChange={(e) => set({ ...form, description: e.target.value })}
+          rows={3}
+          placeholder="Steps to reproduce, environment, expected vs actual…"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+        />
+      </Field>
+    </>
+  );
+
+  const FileField = ({ url, onClear, target }: { url?: string; onClear: () => void; target: "add" | "edit" }) => (
+    <Field label="Attachment">
+      {url ? (
+        <div className="flex items-center gap-2">
+          <a href={url} target="_blank" rel="noreferrer" className="text-xs text-indigo-500 hover:underline truncate">📎 {url.split("/").pop()}</a>
+          <button onClick={onClear} className="text-xs text-red-400 hover:text-red-600">✕</button>
+        </div>
+      ) : (
+        <label className={`flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-500 cursor-pointer hover:border-indigo-400 hover:text-indigo-500 transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
+          {uploading ? "Uploading…" : "📎 Click to attach a file"}
+          <input type="file" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0], target)} />
+        </label>
+      )}
+    </Field>
+  );
+
   return (
     <div>
       <div className="flex flex-wrap gap-2 mb-3 items-center">
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="🔍 Search ID or title…"
-          className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs w-44 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-        />
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 Search ID or title…" className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs w-44 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
         <SmallSel options={["All", ...config.modules]} value={fMod} onChange={setFMod} />
         <SmallSel options={["All", ...BUG_STATUSES]} value={fSt} onChange={setFSt} />
         <SmallSel options={["All", ...SEVERITIES]} value={fSev} onChange={setFSev} />
         <SmallSel options={["All", ...config.devs]} value={fDev} onChange={setFDev} />
         {(search || fMod !== "All" || fSt !== "All" || fSev !== "All" || fDev !== "All") && (
-          <button
-            onClick={() => {
-              setSearch("");
-              setFMod("All");
-              setFSt("All");
-              setFSev("All");
-              setFDev("All");
-            }}
-            className="text-xs text-indigo-500 font-semibold hover:underline"
-          >
-            Clear
-          </button>
+          <button onClick={() => { setSearch(""); setFMod("All"); setFSt("All"); setFSev("All"); setFDev("All"); }} className="text-xs text-indigo-500 font-semibold hover:underline">Clear</button>
         )}
         <span className="text-xs text-gray-400">{filtered.length} of {bugs.length}</span>
-        <button onClick={() => setShowAdd(true)} className="ml-auto bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
-          + Log Bug
-        </button>
+        <button onClick={() => setShowAdd(true)} className="ml-auto bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">+ Log Bug</button>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
@@ -151,75 +149,56 @@ export function BugsTable({ project, onUpdate }: BugsTableProps) {
               <SortTh k="status" label="Status" />
               <SortTh k="assignedDev" label="Dev" />
               <SortTh k="reportedDate" label="Reported" />
+              <th className="px-3 py-2 text-left">Attachment</th>
               <th className="px-3 py-2">Action</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((item) =>
-              editId === item.id ? (
-                <EditableRow key={item.id} row={item} fields={bugFields} onSave={saveEdit} onCancel={() => setEditId(null)} />
-              ) : (
-                <tr key={item.id} onClick={() => setEditId(item.id)} className="border-t hover:bg-red-50 cursor-pointer transition-colors" title="Click to edit">
-                  <td className="px-3 py-2 font-mono text-gray-400">{item.id}</td>
-                  <td className="px-3 py-2 text-gray-800 max-w-xs truncate">{item.title}</td>
-                  <td className="px-3 py-2"><Badge text={item.module} /></td>
-                  <td className="px-3 py-2 font-mono text-gray-400">{item.linkedTC}</td>
-                  <td className="px-3 py-2"><Badge text={item.severity} /></td>
-                  <td className="px-3 py-2"><Badge text={item.priority} /></td>
-                  <td className="px-3 py-2"><Badge text={item.status} /></td>
-                  <td className="px-3 py-2 text-gray-500">{item.assignedDev.replace("Dev - ", "")}</td>
-                  <td className="px-3 py-2 text-gray-400">{item.reportedDate}</td>
-                  <td className="px-3 py-2 text-indigo-400 text-xs">✏️ edit</td>
-                </tr>
-              ),
-            )}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={10} className="text-center py-8 text-gray-400">
-                  No bugs match your filters.
+            {filtered.map((item) => (
+              <tr key={item.id} onClick={() => setEditForm({ ...item })} className="border-t hover:bg-red-50 cursor-pointer transition-colors">
+                <td className="px-3 py-2 font-mono text-gray-400">{item.id}</td>
+                <td className="px-3 py-2 text-gray-800 max-w-xs">
+                  <div className="truncate">{item.title}</div>
+                  {item.description && <div className="text-gray-400 truncate mt-0.5">{item.description}</div>}
                 </td>
+                <td className="px-3 py-2"><Badge text={item.module} /></td>
+                <td className="px-3 py-2 font-mono text-gray-400">{item.linkedTC}</td>
+                <td className="px-3 py-2"><Badge text={item.severity} /></td>
+                <td className="px-3 py-2"><Badge text={item.priority} /></td>
+                <td className="px-3 py-2"><Badge text={item.status} /></td>
+                <td className="px-3 py-2 text-gray-500">{item.assignedDev.replace("Dev - ", "")}</td>
+                <td className="px-3 py-2 text-gray-400">{item.reportedDate}</td>
+                <td className="px-3 py-2"><AttachmentLink url={item.attachmentUrl} /></td>
+                <td className="px-3 py-2 text-indigo-400 text-xs">✏️ edit</td>
               </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={11} className="text-center py-8 text-gray-400">No bugs match your filters.</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
+      {/* Add drawer */}
       {showAdd && (
         <Modal title="Log New Bug" onClose={() => setShowAdd(false)}>
-          <Field label="Title">
-            <Inp value={addForm.title} onChange={(event) => setAddForm({ ...addForm, title: event.target.value })} placeholder="Describe the bug" />
-          </Field>
-          <Field label="Module">
-            <Sel options={config.modules} value={addForm.module} onChange={(event) => setAddForm({ ...addForm, module: event.target.value })} />
-          </Field>
-          <Field label="Linked TC">
-            <Inp value={addForm.linkedTC} onChange={(event) => setAddForm({ ...addForm, linkedTC: event.target.value })} placeholder="e.g. TC-003" />
-          </Field>
-          <Field label="Severity">
-            <Sel options={SEVERITIES} value={addForm.severity} onChange={(event) => setAddForm({ ...addForm, severity: event.target.value as typeof addForm.severity })} />
-          </Field>
-          <Field label="Priority">
-            <Sel options={PRIORITIES} value={addForm.priority} onChange={(event) => setAddForm({ ...addForm, priority: event.target.value as typeof addForm.priority })} />
-          </Field>
-          <Field label="Status">
-            <Sel options={BUG_STATUSES} value={addForm.status} onChange={(event) => setAddForm({ ...addForm, status: event.target.value as typeof addForm.status })} />
-          </Field>
-          <Field label="Assigned Dev">
-            <Sel options={config.devs} value={addForm.assignedDev} onChange={(event) => setAddForm({ ...addForm, assignedDev: event.target.value })} />
-          </Field>
-          <Field label="Release">
-            <Sel options={config.releases} value={addForm.release} onChange={(event) => setAddForm({ ...addForm, release: event.target.value })} />
-          </Field>
-          <Field label="Reported Date">
-            <Inp type="date" value={addForm.reportedDate} onChange={(event) => setAddForm({ ...addForm, reportedDate: event.target.value })} />
-          </Field>
+          <FormFields form={addForm} set={setAddForm} />
+          <FileField url={addForm.attachmentUrl} onClear={() => setAddForm({ ...addForm, attachmentUrl: "" })} target="add" />
           <div className="flex gap-2 mt-4">
-            <button onClick={saveAdd} className="flex-1 bg-red-500 text-white font-semibold py-2 rounded-lg">
-              Log Bug
-            </button>
-            <button onClick={() => setShowAdd(false)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2 rounded-lg">
-              Cancel
-            </button>
+            <button onClick={saveAdd} disabled={uploading} className="flex-1 bg-red-500 text-white font-semibold py-2 rounded-lg disabled:opacity-50">Log Bug</button>
+            <button onClick={() => setShowAdd(false)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2 rounded-lg">Cancel</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit drawer */}
+      {editForm && (
+        <Modal title={`Edit ${editForm.id}`} onClose={() => setEditForm(null)}>
+          <FormFields form={editForm} set={setEditForm} />
+          <FileField url={editForm.attachmentUrl} onClear={() => setEditForm({ ...editForm, attachmentUrl: "" })} target="edit" />
+          <div className="flex gap-2 mt-4">
+            <button onClick={saveEdit} disabled={uploading} className="flex-1 bg-red-500 text-white font-semibold py-2 rounded-lg disabled:opacity-50">Save</button>
+            <button onClick={() => setEditForm(null)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2 rounded-lg">Cancel</button>
           </div>
         </Modal>
       )}

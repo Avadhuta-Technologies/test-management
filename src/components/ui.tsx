@@ -64,15 +64,16 @@ export function NavTab({ label, active, onClick, count }: NavTabProps) {
 }
 
 type ModalProps = { title: string; onClose: () => void; children: ReactNode; wide?: boolean };
-export function Modal({ title, onClose, children, wide }: ModalProps) {
+export function Modal({ title, onClose, children }: ModalProps) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-      <div className={`bg-white rounded-xl shadow-2xl w-full ${wide ? "max-w-2xl" : "max-w-lg"} max-h-[90vh] overflow-y-auto`}>
-        <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white z-10">
+    <div className="fixed inset-0 z-50 flex">
+      <div className="drawer-overlay flex-1 bg-white/10 backdrop-blur-sm" onClick={onClose} />
+      <div className="drawer-panel w-1/2 min-w-80 bg-white shadow-2xl flex flex-col h-full">
+        <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-white z-10">
           <h3 className="font-bold text-gray-800">{title}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold">×</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none">×</button>
         </div>
-        <div className="p-4">{children}</div>
+        <div className="p-5 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
   );
@@ -92,7 +93,7 @@ export function Inp(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />;
 }
 
-type SelProps = SelectHTMLAttributes<HTMLSelectElement> & { options: string[] };
+type SelProps = SelectHTMLAttributes<HTMLSelectElement> & { options: readonly string[] };
 export function Sel({ options, ...props }: SelProps) {
   return (
     <select {...props} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
@@ -115,7 +116,7 @@ export function ChartCard({ title, children, full }: ChartCardProps) {
   );
 }
 
-type SmallSelProps = { options: string[]; value: string; onChange: (value: string) => void; prefix?: string };
+type SmallSelProps = { options: readonly string[]; value: string; onChange: (value: string) => void; prefix?: string };
 export function SmallSel({ options, value, onChange, prefix = "" }: SmallSelProps) {
   return (
     <select value={value} onChange={(event) => onChange(event.target.value)} className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">

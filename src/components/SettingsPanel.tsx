@@ -1,11 +1,10 @@
 import { useState } from "react";
 import type { Project } from "../types";
+import { updateProjectConfig, updateProjectMeta } from "../db";
 import { Field, Inp, Modal, SectionTitle } from "./ui";
 
 type SettingsPanelProps = { project: Project; onUpdate: (project: Project) => void };
-
 type ConfigKey = keyof Project["config"];
-
 type SectionConfig = { key: ConfigKey; label: string; icon: string; hint: string };
 
 export function SettingsPanel({ project, onUpdate }: SettingsPanelProps) {
@@ -22,16 +21,25 @@ export function SettingsPanel({ project, onUpdate }: SettingsPanelProps) {
     { key: "releases", label: "Releases", icon: "🚀", hint: "e.g. R3 - May 1" },
   ];
 
-  const addValue = (key: ConfigKey) => {
+  const addValue = async (key: ConfigKey) => {
     const value = vals[key].trim();
     if (!value || config[key].includes(value)) return;
-    onUpdate({ ...project, config: { ...config, [key]: [...config[key], value] } });
+    const newConfig = { ...config, [key]: [...config[key], value] };
+    await updateProjectConfig(project.id, newConfig);
+    onUpdate({ ...project, config: newConfig });
     setVals((prev) => ({ ...prev, [key]: "" }));
   };
 
-  const removeValue = (key: ConfigKey, value: string) => {
-    onUpdate({ ...project, config: { ...config, [key]: config[key].filter((item) => item !== value) } });
+  const removeValue = async (key: ConfigKey, value: string) => {
+    const newConfig = { ...config, [key]: config[key].filter((item) => item !== value) };
+    await updateProjectConfig(project.id, newConfig);
+    onUpdate({ ...project, config: newConfig });
     setConfirmDel(null);
+  };
+
+  const saveReleaseDate = async () => {
+    await updateProjectMeta(project.id, { releaseDate: rd });
+    onUpdate({ ...project, releaseDate: rd });
   };
 
   return (
@@ -40,10 +48,8 @@ export function SettingsPanel({ project, onUpdate }: SettingsPanelProps) {
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-4">
         <p className="text-sm font-bold text-gray-700 mb-2">📅 Target Release Date</p>
         <div className="flex gap-2 items-center">
-          <Inp type="date" value={rd} onChange={(event) => setRd(event.target.value)} style={{ maxWidth: 200 }} />
-          <button onClick={() => onUpdate({ ...project, releaseDate: rd })} className="bg-indigo-600 text-white text-xs font-bold px-3 py-2 rounded-lg">
-            Save
-          </button>
+          <Inp type="date" value={rd} onChange={(e) => setRd(e.target.value)} style={{ maxWidth: 200 }} />
+          <button onClick={saveReleaseDate} className="bg-indigo-600 text-white text-xs font-bold px-3 py-2 rounded-lg">Save</button>
         </div>
       </div>
 
@@ -55,9 +61,7 @@ export function SettingsPanel({ project, onUpdate }: SettingsPanelProps) {
               {config[section.key].map((value) => (
                 <span key={value} className="flex items-center gap-1 bg-indigo-50 text-indigo-700 text-xs font-semibold px-2 py-1 rounded-full">
                   {value}
-                  <button onClick={() => setConfirmDel({ key: section.key, val: value })} className="ml-1 text-indigo-300 hover:text-red-500 font-bold">
-                    ×
-                  </button>
+                  <button onClick={() => setConfirmDel({ key: section.key, val: value })} className="ml-1 text-indigo-300 hover:text-red-500 font-bold">×</button>
                 </span>
               ))}
               {config[section.key].length === 0 && <span className="text-xs text-gray-300 italic">No values yet</span>}
@@ -65,14 +69,12 @@ export function SettingsPanel({ project, onUpdate }: SettingsPanelProps) {
             <div className="flex gap-2">
               <input
                 value={vals[section.key]}
-                onChange={(event) => setVals((prev) => ({ ...prev, [section.key]: event.target.value }))}
-                onKeyDown={(event) => event.key === "Enter" && addValue(section.key)}
+                onChange={(e) => setVals((prev) => ({ ...prev, [section.key]: e.target.value }))}
+                onKeyDown={(e) => e.key === "Enter" && addValue(section.key)}
                 placeholder={section.hint}
                 className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300"
               />
-              <button onClick={() => addValue(section.key)} className="bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
-                Add
-              </button>
+              <button onClick={() => addValue(section.key)} className="bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">Add</button>
             </div>
           </div>
         ))}
@@ -83,12 +85,8 @@ export function SettingsPanel({ project, onUpdate }: SettingsPanelProps) {
           <p className="text-sm text-gray-600 mb-1">Remove <strong>"{confirmDel.val}"</strong>?</p>
           <p className="text-xs text-orange-500 mb-4">Existing records won't be affected.</p>
           <div className="flex gap-2">
-            <button onClick={() => removeValue(confirmDel.key, confirmDel.val)} className="flex-1 bg-red-500 text-white font-semibold py-2 rounded-lg">
-              Remove
-            </button>
-            <button onClick={() => setConfirmDel(null)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2 rounded-lg">
-              Cancel
-            </button>
+            <button onClick={() => removeValue(confirmDel.key, confirmDel.val)} className="flex-1 bg-red-500 text-white font-semibold py-2 rounded-lg">Remove</button>
+            <button onClick={() => setConfirmDel(null)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2 rounded-lg">Cancel</button>
           </div>
         </Modal>
       )}
