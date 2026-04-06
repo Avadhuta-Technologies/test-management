@@ -51,7 +51,7 @@ export function BugsTable({ project, onUpdate, clickUpConfig }: BugsTableProps) 
   const blank: Omit<Bug, "id"> = {
     title: "", module: config.modules[0] ?? "", linkedTC: "", severity: "Major", priority: "P3 - Medium",
     status: "Open", assignedDev: config.devs[0] ?? "", reportedDate: today, closedDate: "",
-    reopened: false, release: config.releases[0] ?? "", description: "", attachmentUrl: "",
+    reopened: false, release: config.releases[0] ?? "", preconditions: "", description: "", expectedResult: "", actualResult: "", attachmentUrl: "",
   };
   const [addForm, setAddForm] = useState<Omit<Bug, "id">>(blank);
 
@@ -170,12 +170,39 @@ export function BugsTable({ project, onUpdate, clickUpConfig }: BugsTableProps) 
       <Field label="Release"><Sel options={config.releases} value={form.release} onChange={(e) => set({ ...form, release: e.target.value })} /></Field>
       <Field label="Reported Date"><Inp type="date" value={form.reportedDate} onChange={(e) => set({ ...form, reportedDate: e.target.value })} /></Field>
       <Field label="Closed Date"><Inp type="date" value={form.closedDate ?? ""} onChange={(e) => set({ ...form, closedDate: e.target.value })} /></Field>
-      <Field label="Description">
+      <Field label="Preconditions">
+        <textarea
+          value={form.preconditions ?? ""}
+          onChange={(e) => set({ ...form, preconditions: e.target.value })}
+          rows={2}
+          placeholder="Environment setup, required data, prior state…"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+        />
+      </Field>
+      <Field label="Description / Steps to Reproduce">
         <textarea
           value={form.description ?? ""}
           onChange={(e) => set({ ...form, description: e.target.value })}
           rows={3}
-          placeholder="Steps to reproduce, environment, expected vs actual…"
+          placeholder="Step-by-step actions to reproduce the bug…"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+        />
+      </Field>
+      <Field label="Expected Result">
+        <textarea
+          value={form.expectedResult ?? ""}
+          onChange={(e) => set({ ...form, expectedResult: e.target.value })}
+          rows={2}
+          placeholder="What should have happened…"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+        />
+      </Field>
+      <Field label="Actual Result">
+        <textarea
+          value={form.actualResult ?? ""}
+          onChange={(e) => set({ ...form, actualResult: e.target.value })}
+          rows={2}
+          placeholder="What actually happened (the bug behavior)…"
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
         />
       </Field>

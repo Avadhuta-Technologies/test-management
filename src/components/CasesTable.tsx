@@ -48,7 +48,7 @@ export function CasesTable({ project, onUpdate, clickUpConfig }: CasesTableProps
   const blank: Omit<TestCase, "id"> = {
     title: "", module: config.modules[0] ?? "", story: config.stories[0] ?? "",
     sprint: config.sprints[0] ?? "", status: "Not Run", assignee: "Test Engineer",
-    date: today, description: "", attachmentUrl: "",
+    date: today, preconditions: "", description: "", expectedResult: "", actualResult: "", attachmentUrl: "",
   };
   const [addForm, setAddForm] = useState<Omit<TestCase, "id">>(blank);
 
@@ -169,7 +169,7 @@ export function CasesTable({ project, onUpdate, clickUpConfig }: CasesTableProps
       title: "", module: config.modules[0] ?? "", linkedTC: tcId,
       severity: "Major", priority: "P3 - Medium", status: "Open",
       assignedDev: config.devs[0] ?? "", reportedDate: today, closedDate: "",
-      reopened: false, release: config.releases[0] ?? "", description: "", attachmentUrl: "",
+      reopened: false, release: config.releases[0] ?? "", preconditions: "", description: "", expectedResult: "", actualResult: "", attachmentUrl: "",
     });
   };
 
@@ -271,12 +271,39 @@ export function CasesTable({ project, onUpdate, clickUpConfig }: CasesTableProps
           <Field label="Status"><Sel options={STATUSES} value={addForm.status} onChange={(e) => setAddForm({ ...addForm, status: e.target.value as typeof addForm.status })} /></Field>
           <Field label="Assignee"><Inp value={addForm.assignee} onChange={(e) => setAddForm({ ...addForm, assignee: e.target.value })} /></Field>
           <Field label="Date"><Inp type="date" value={addForm.date} onChange={(e) => setAddForm({ ...addForm, date: e.target.value })} /></Field>
-          <Field label="Description">
+          <Field label="Preconditions">
+            <textarea
+              value={addForm.preconditions ?? ""}
+              onChange={(e) => setAddForm({ ...addForm, preconditions: e.target.value })}
+              rows={2}
+              placeholder="Environment setup, required data, prior state…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+            />
+          </Field>
+          <Field label="Description / Steps">
             <textarea
               value={addForm.description ?? ""}
               onChange={(e) => setAddForm({ ...addForm, description: e.target.value })}
               rows={3}
-              placeholder="Steps to reproduce, expected vs actual result…"
+              placeholder="Step-by-step actions to execute the test…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+            />
+          </Field>
+          <Field label="Expected Result">
+            <textarea
+              value={addForm.expectedResult ?? ""}
+              onChange={(e) => setAddForm({ ...addForm, expectedResult: e.target.value })}
+              rows={2}
+              placeholder="What should happen when the test passes…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+            />
+          </Field>
+          <Field label="Actual Result">
+            <textarea
+              value={addForm.actualResult ?? ""}
+              onChange={(e) => setAddForm({ ...addForm, actualResult: e.target.value })}
+              rows={2}
+              placeholder="What actually happened during execution…"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
             />
           </Field>
@@ -312,12 +339,39 @@ export function CasesTable({ project, onUpdate, clickUpConfig }: CasesTableProps
           <Field label="Assigned Dev"><Sel options={config.devs} value={bugForm.assignedDev} onChange={(e) => setBugForm({ ...bugForm, assignedDev: e.target.value })} /></Field>
           <Field label="Release"><Sel options={config.releases} value={bugForm.release} onChange={(e) => setBugForm({ ...bugForm, release: e.target.value })} /></Field>
           <Field label="Reported Date"><Inp type="date" value={bugForm.reportedDate} onChange={(e) => setBugForm({ ...bugForm, reportedDate: e.target.value })} onKeyDown={(e) => e.preventDefault()} /></Field>
-          <Field label="Description">
+          <Field label="Preconditions">
+            <textarea
+              value={bugForm.preconditions ?? ""}
+              onChange={(e) => setBugForm({ ...bugForm, preconditions: e.target.value })}
+              rows={2}
+              placeholder="Environment setup, required data, prior state…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+            />
+          </Field>
+          <Field label="Description / Steps to Reproduce">
             <textarea
               value={bugForm.description ?? ""}
               onChange={(e) => setBugForm({ ...bugForm, description: e.target.value })}
               rows={3}
-              placeholder="Steps to reproduce, environment, expected vs actual…"
+              placeholder="Step-by-step actions to reproduce the bug…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+            />
+          </Field>
+          <Field label="Expected Result">
+            <textarea
+              value={bugForm.expectedResult ?? ""}
+              onChange={(e) => setBugForm({ ...bugForm, expectedResult: e.target.value })}
+              rows={2}
+              placeholder="What should have happened…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+            />
+          </Field>
+          <Field label="Actual Result">
+            <textarea
+              value={bugForm.actualResult ?? ""}
+              onChange={(e) => setBugForm({ ...bugForm, actualResult: e.target.value })}
+              rows={2}
+              placeholder="What actually happened (the bug behavior)…"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
             />
           </Field>
@@ -338,12 +392,39 @@ export function CasesTable({ project, onUpdate, clickUpConfig }: CasesTableProps
           <Field label="Status"><Sel options={STATUSES} value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value as typeof editForm.status })} /></Field>
           <Field label="Assignee"><Inp value={editForm.assignee} onChange={(e) => setEditForm({ ...editForm, assignee: e.target.value })} /></Field>
           <Field label="Date"><Inp type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} /></Field>
-          <Field label="Description">
+          <Field label="Preconditions">
+            <textarea
+              value={editForm.preconditions ?? ""}
+              onChange={(e) => setEditForm({ ...editForm, preconditions: e.target.value })}
+              rows={2}
+              placeholder="Environment setup, required data, prior state…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+            />
+          </Field>
+          <Field label="Description / Steps">
             <textarea
               value={editForm.description ?? ""}
               onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
               rows={3}
-              placeholder="Steps to reproduce, expected vs actual result…"
+              placeholder="Step-by-step actions to execute the test…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+            />
+          </Field>
+          <Field label="Expected Result">
+            <textarea
+              value={editForm.expectedResult ?? ""}
+              onChange={(e) => setEditForm({ ...editForm, expectedResult: e.target.value })}
+              rows={2}
+              placeholder="What should happen when the test passes…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+            />
+          </Field>
+          <Field label="Actual Result">
+            <textarea
+              value={editForm.actualResult ?? ""}
+              onChange={(e) => setEditForm({ ...editForm, actualResult: e.target.value })}
+              rows={2}
+              placeholder="What actually happened during execution…"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
             />
           </Field>

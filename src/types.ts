@@ -38,7 +38,10 @@ export interface TestCase {
   status: Status;
   assignee: string;
   date: string;
+  preconditions?: string;
   description?: string;
+  expectedResult?: string;
+  actualResult?: string;
   attachmentUrl?: string;
   clickupTaskId?: string;
   clickupTaskUrl?: string;
@@ -58,7 +61,10 @@ export interface Bug {
   reopened: boolean;
   release: string;
   reportedBy?: string;
+  preconditions?: string;
   description?: string;
+  expectedResult?: string;
+  actualResult?: string;
   attachmentUrl?: string;
   clickupTaskId?: string;
   clickupTaskUrl?: string;

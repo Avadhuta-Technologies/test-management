@@ -20,11 +20,11 @@ function rowToProject(p: any, cfg: any, cases: any[], bugs: any[]): Project {
 }
 
 function rowToCase(r: any): TestCase {
-  return { id: r.id, title: r.title, module: r.module, story: r.story, sprint: r.sprint, status: r.status, assignee: r.assignee, date: r.date, description: r.description ?? "", attachmentUrl: r.attachment_url ?? "", clickupTaskId: r.clickup_task_id ?? undefined, clickupTaskUrl: r.clickup_task_url ?? undefined };
+  return { id: r.id, title: r.title, module: r.module, story: r.story, sprint: r.sprint, status: r.status, assignee: r.assignee, date: r.date, preconditions: r.preconditions ?? "", description: r.description ?? "", expectedResult: r.expected_result ?? "", actualResult: r.actual_result ?? "", attachmentUrl: r.attachment_url ?? "", clickupTaskId: r.clickup_task_id ?? undefined, clickupTaskUrl: r.clickup_task_url ?? undefined };
 }
 
 function rowToBug(r: any): Bug {
-  return { id: r.id, title: r.title, module: r.module, linkedTC: r.linked_tc, severity: r.severity, priority: r.priority, status: r.status, assignedDev: r.assigned_dev, reportedDate: r.reported_date, closedDate: r.closed_date ?? "", reopened: r.reopened ?? false, release: r.release, reportedBy: r.reported_by, description: r.description ?? "", attachmentUrl: r.attachment_url ?? "", clickupTaskId: r.clickup_task_id ?? undefined, clickupTaskUrl: r.clickup_task_url ?? undefined };
+  return { id: r.id, title: r.title, module: r.module, linkedTC: r.linked_tc, severity: r.severity, priority: r.priority, status: r.status, assignedDev: r.assigned_dev, reportedDate: r.reported_date, closedDate: r.closed_date ?? "", reopened: r.reopened ?? false, release: r.release, reportedBy: r.reported_by, preconditions: r.preconditions ?? "", description: r.description ?? "", expectedResult: r.expected_result ?? "", actualResult: r.actual_result ?? "", attachmentUrl: r.attachment_url ?? "", clickupTaskId: r.clickup_task_id ?? undefined, clickupTaskUrl: r.clickup_task_url ?? undefined };
 }
 
 // ── projects ───────────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ export async function addTestCase(projectId: string, data: Omit<TestCase, "id">)
   const id = `TC-${String((count ?? 0) + 1).padStart(3, "0")}`;
   const { data: r, error } = await supabase
     .from("test_cases")
-    .insert({ id, project_id: projectId, title: data.title, module: data.module, story: data.story, sprint: data.sprint, status: data.status, assignee: data.assignee, date: data.date, description: data.description || null, attachment_url: data.attachmentUrl || null })
+    .insert({ id, project_id: projectId, title: data.title, module: data.module, story: data.story, sprint: data.sprint, status: data.status, assignee: data.assignee, date: data.date, preconditions: data.preconditions || null, description: data.description || null, expected_result: data.expectedResult || null, actual_result: data.actualResult || null, attachment_url: data.attachmentUrl || null })
     .select()
     .single();
   if (error) throw error;
@@ -110,7 +110,10 @@ export async function updateTestCase(id: string, data: Partial<TestCase>): Promi
   if (data.status !== undefined) patch.status = data.status;
   if (data.assignee !== undefined) patch.assignee = data.assignee;
   if (data.date !== undefined) patch.date = data.date;
+  if (data.preconditions !== undefined) patch.preconditions = data.preconditions || null;
   if (data.description !== undefined) patch.description = data.description || null;
+  if (data.expectedResult !== undefined) patch.expected_result = data.expectedResult || null;
+  if (data.actualResult !== undefined) patch.actual_result = data.actualResult || null;
   if (data.attachmentUrl !== undefined) patch.attachment_url = data.attachmentUrl || null;
   if (data.clickupTaskId !== undefined) patch.clickup_task_id = data.clickupTaskId || null;
   if (data.clickupTaskUrl !== undefined) patch.clickup_task_url = data.clickupTaskUrl || null;
@@ -125,7 +128,7 @@ export async function addBug(projectId: string, data: Omit<Bug, "id">): Promise<
   const id = `BUG-${String((count ?? 0) + 1).padStart(3, "0")}`;
   const { data: r, error } = await supabase
     .from("bugs")
-    .insert({ id, project_id: projectId, title: data.title, module: data.module, linked_tc: data.linkedTC, severity: data.severity, priority: data.priority, status: data.status, assigned_dev: data.assignedDev, reported_date: data.reportedDate, closed_date: data.closedDate || null, reopened: data.reopened, release: data.release, reported_by: data.reportedBy ?? null, description: data.description || null, attachment_url: data.attachmentUrl || null })
+    .insert({ id, project_id: projectId, title: data.title, module: data.module, linked_tc: data.linkedTC, severity: data.severity, priority: data.priority, status: data.status, assigned_dev: data.assignedDev, reported_date: data.reportedDate, closed_date: data.closedDate || null, reopened: data.reopened, release: data.release, reported_by: data.reportedBy ?? null, preconditions: data.preconditions || null, description: data.description || null, expected_result: data.expectedResult || null, actual_result: data.actualResult || null, attachment_url: data.attachmentUrl || null })
     .select()
     .single();
   if (error) throw error;
@@ -145,7 +148,10 @@ export async function updateBug(id: string, data: Partial<Bug>): Promise<void> {
   if (data.closedDate !== undefined) patch.closed_date = data.closedDate || null;
   if (data.reopened !== undefined) patch.reopened = data.reopened;
   if (data.release !== undefined) patch.release = data.release;
+  if (data.preconditions !== undefined) patch.preconditions = data.preconditions || null;
   if (data.description !== undefined) patch.description = data.description || null;
+  if (data.expectedResult !== undefined) patch.expected_result = data.expectedResult || null;
+  if (data.actualResult !== undefined) patch.actual_result = data.actualResult || null;
   if (data.attachmentUrl !== undefined) patch.attachment_url = data.attachmentUrl || null;
   if (data.clickupTaskId !== undefined) patch.clickup_task_id = data.clickupTaskId || null;
   if (data.clickupTaskUrl !== undefined) patch.clickup_task_url = data.clickupTaskUrl || null;
