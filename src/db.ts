@@ -20,11 +20,11 @@ function rowToProject(p: any, cfg: any, cases: any[], bugs: any[]): Project {
 }
 
 function rowToCase(r: any): TestCase {
-  return { id: r.id, title: r.title, module: r.module, story: r.story, sprint: r.sprint, status: r.status, assignee: r.assignee, date: r.date, preconditions: r.preconditions ?? "", description: r.description ?? "", expectedResult: r.expected_result ?? "", actualResult: r.actual_result ?? "", attachmentUrl: r.attachment_url ?? "", clickupTaskId: r.clickup_task_id ?? undefined, clickupTaskUrl: r.clickup_task_url ?? undefined };
+  return { id: r.id, title: r.title, module: r.module, story: r.story, sprint: r.sprint, status: r.status, assignee: r.assignee, date: r.date, preconditions: r.preconditions ?? "", description: r.description ?? "", expectedResult: r.expected_result ?? "", actualResult: r.actual_result ?? "", attachmentUrl: r.attachment_url ?? "", clickupTaskId: r.clickup_task_id ?? undefined, clickupTaskUrl: r.clickup_task_url ?? undefined, archived: r.archived ?? false };
 }
 
 function rowToBug(r: any): Bug {
-  return { id: r.id, title: r.title, module: r.module, linkedTC: r.linked_tc, severity: r.severity, priority: r.priority, status: r.status, assignedDev: r.assigned_dev, reportedDate: r.reported_date, closedDate: r.closed_date ?? "", reopened: r.reopened ?? false, release: r.release, reportedBy: r.reported_by, preconditions: r.preconditions ?? "", description: r.description ?? "", expectedResult: r.expected_result ?? "", actualResult: r.actual_result ?? "", attachmentUrl: r.attachment_url ?? "", clickupTaskId: r.clickup_task_id ?? undefined, clickupTaskUrl: r.clickup_task_url ?? undefined };
+  return { id: r.id, title: r.title, module: r.module, linkedTC: r.linked_tc, severity: r.severity, priority: r.priority, status: r.status, assignedDev: r.assigned_dev, reportedDate: r.reported_date, closedDate: r.closed_date ?? "", reopened: r.reopened ?? false, release: r.release, reportedBy: r.reported_by, preconditions: r.preconditions ?? "", description: r.description ?? "", expectedResult: r.expected_result ?? "", actualResult: r.actual_result ?? "", attachmentUrl: r.attachment_url ?? "", clickupTaskId: r.clickup_task_id ?? undefined, clickupTaskUrl: r.clickup_task_url ?? undefined, archived: r.archived ?? false };
 }
 
 // ── projects ───────────────────────────────────────────────────────────────
@@ -156,6 +156,36 @@ export async function updateBug(id: string, data: Partial<Bug>): Promise<void> {
   if (data.clickupTaskId !== undefined) patch.clickup_task_id = data.clickupTaskId || null;
   if (data.clickupTaskUrl !== undefined) patch.clickup_task_url = data.clickupTaskUrl || null;
   const { error } = await supabase.from("bugs").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+// ── archive ────────────────────────────────────────────────────────────────
+
+export async function archiveTestCase(id: string, projectId: string, cascadeBugs: boolean): Promise<void> {
+  const { error } = await supabase.from("test_cases").update({ archived: true }).eq("id", id);
+  if (error) throw error;
+  if (cascadeBugs) {
+    const { error: bugError } = await supabase.from("bugs").update({ archived: true }).eq("project_id", projectId).eq("linked_tc", id);
+    if (bugError) throw bugError;
+  }
+}
+
+export async function unarchiveTestCase(id: string, projectId: string, unarchiveBugs: boolean): Promise<void> {
+  const { error } = await supabase.from("test_cases").update({ archived: false }).eq("id", id);
+  if (error) throw error;
+  if (unarchiveBugs) {
+    const { error: bugError } = await supabase.from("bugs").update({ archived: false }).eq("project_id", projectId).eq("linked_tc", id);
+    if (bugError) throw bugError;
+  }
+}
+
+export async function archiveBug(id: string): Promise<void> {
+  const { error } = await supabase.from("bugs").update({ archived: true }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function unarchiveBug(id: string): Promise<void> {
+  const { error } = await supabase.from("bugs").update({ archived: false }).eq("id", id);
   if (error) throw error;
 }
 

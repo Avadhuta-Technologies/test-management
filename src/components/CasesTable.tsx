@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Bug, Project, TestCase, ClickUpConfig } from "../types";
 import { BUG_STATUSES, PRIORITIES, SEVERITIES, STATUSES } from "../types";
-import { addBug, addTestCase, updateTestCase, uploadAttachment } from "../db";
+import { addBug, addTestCase, updateTestCase, uploadAttachment, archiveTestCase, unarchiveTestCase } from "../db";
 import { fetchTask, parseTaskId } from "../clickup";
 import type { ClickUpTask } from "../clickup";
 import { Badge, Field, Inp, Modal, Sel, SmallSel } from "./ui";
@@ -41,6 +41,8 @@ export function CasesTable({ project, onUpdate, clickUpConfig }: CasesTableProps
   const [editId, setEditId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveConfirm, setArchiveConfirm] = useState<TestCase | null>(null);
   const [logBugForTC, setLogBugForTC] = useState<string | null>(null);
   const [bugForm, setBugForm] = useState<Omit<Bug, "id"> | null>(null);
   const today = new Date().toISOString().split("T")[0];
@@ -73,14 +75,14 @@ export function CasesTable({ project, onUpdate, clickUpConfig }: CasesTableProps
   );
 
   const filtered = useMemo(() => {
-    let rows = [...cases];
+    let rows = cases.filter((c) => !!c.archived === showArchived);
     if (search) { const q = search.toLowerCase(); rows = rows.filter((c) => c.title.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)); }
     if (fMod !== "All") rows = rows.filter((c) => c.module === fMod);
     if (fSt !== "All") rows = rows.filter((c) => c.status === fSt);
     if (fSprint !== "All") rows = rows.filter((c) => c.sprint === fSprint);
     rows.sort((a, b) => { const av = String(a[sortKey] ?? ""), bv = String(b[sortKey] ?? ""); return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av); });
     return rows;
-  }, [cases, search, fMod, fSt, fSprint, sortKey, sortDir]);
+  }, [cases, search, fMod, fSt, fSprint, sortKey, sortDir, showArchived]);
 
   const handleAddFile = async (file: File) => {
     setUploading(true);
@@ -97,6 +99,21 @@ export function CasesTable({ project, onUpdate, clickUpConfig }: CasesTableProps
       const url = await uploadAttachment(file, `test-cases/${Date.now()}-${file.name}`);
       setEditForm((f) => f ? { ...f, attachmentUrl: url } : f);
     } finally { setUploading(false); }
+  };
+
+  const handleArchive = async (tc: TestCase, cascade: boolean) => {
+    await archiveTestCase(tc.id, project.id, cascade);
+    const updatedCases = cases.map((c) => c.id === tc.id ? { ...c, archived: true } : c);
+    const updatedBugs = cascade
+      ? project.bugs.map((b) => b.linkedTC === tc.id ? { ...b, archived: true } : b)
+      : project.bugs;
+    onUpdate({ ...project, cases: updatedCases, bugs: updatedBugs });
+    setArchiveConfirm(null);
+  };
+
+  const handleUnarchive = async (tc: TestCase) => {
+    await unarchiveTestCase(tc.id, project.id, false);
+    onUpdate({ ...project, cases: cases.map((c) => c.id === tc.id ? { ...c, archived: false } : c) });
   };
 
   const saveAdd = async () => {
@@ -192,8 +209,14 @@ export function CasesTable({ project, onUpdate, clickUpConfig }: CasesTableProps
         {(search || fMod !== "All" || fSt !== "All" || fSprint !== "All") && (
           <button onClick={() => { setSearch(""); setFMod("All"); setFSt("All"); setFSprint("All"); }} className="text-xs text-indigo-500 font-semibold hover:underline">Clear</button>
         )}
-        <span className="text-xs text-gray-600">{filtered.length} of {cases.length}</span>
-        <button onClick={() => setShowAdd(true)} className="ml-auto bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">+ Add</button>
+        <span className="text-xs text-gray-600">{filtered.length} of {cases.filter((c) => !!c.archived === showArchived).length}</span>
+        <button
+          onClick={() => setShowArchived((v) => !v)}
+          className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${showArchived ? "bg-amber-100 text-amber-700 border-amber-300" : "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200"}`}
+        >
+          {showArchived ? "📦 Archived" : "📦 Show Archived"}
+        </button>
+        {!showArchived && <button onClick={() => setShowAdd(true)} className="ml-auto bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">+ Add</button>}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
@@ -230,7 +253,7 @@ export function CasesTable({ project, onUpdate, clickUpConfig }: CasesTableProps
                   <td className="px-3 py-2"><AttachmentLink url={item.attachmentUrl} /></td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-indigo-400 text-xs">✏️ edit</span>
+                      {!showArchived && <span className="text-indigo-400 text-xs">✏️ edit</span>}
                       {item.clickupTaskId && (
                         <a
                           href={item.clickupTaskUrl ?? `https://app.clickup.com/t/${item.clickupTaskId}`}
@@ -243,12 +266,29 @@ export function CasesTable({ project, onUpdate, clickUpConfig }: CasesTableProps
                           🔗 CU
                         </a>
                       )}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openLogBug(item.id); }}
-                        className="text-xs bg-red-50 text-red-500 font-semibold px-2 py-0.5 rounded-full hover:bg-red-100"
-                      >
-                        🐛 {bugCountByTC[item.id] ? `${bugCountByTC[item.id]} bug${bugCountByTC[item.id] > 1 ? "s" : ""}` : "Log Bug"}
-                      </button>
+                      {!showArchived && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openLogBug(item.id); }}
+                          className="text-xs bg-red-50 text-red-500 font-semibold px-2 py-0.5 rounded-full hover:bg-red-100"
+                        >
+                          🐛 {bugCountByTC[item.id] ? `${bugCountByTC[item.id]} bug${bugCountByTC[item.id] > 1 ? "s" : ""}` : "Log Bug"}
+                        </button>
+                      )}
+                      {showArchived ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleUnarchive(item); }}
+                          className="text-xs bg-green-50 text-green-600 font-semibold px-2 py-0.5 rounded-full hover:bg-green-100"
+                        >
+                          ↩ Restore
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setArchiveConfirm(item); }}
+                          className="text-xs bg-amber-50 text-amber-600 font-semibold px-2 py-0.5 rounded-full hover:bg-amber-100"
+                        >
+                          📦 Archive
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -382,6 +422,39 @@ export function CasesTable({ project, onUpdate, clickUpConfig }: CasesTableProps
         </Modal>
       )}
 
+      {/* Archive confirm */}
+      {archiveConfirm && (
+        <Modal title="Archive Test Case?" onClose={() => setArchiveConfirm(null)}>
+          <p className="text-sm text-gray-700 mb-1">Archive <strong>{archiveConfirm.id}: {archiveConfirm.title}</strong>?</p>
+          <p className="text-xs text-gray-500 mb-4">Archived items are hidden from the active view and can be restored later.</p>
+          {bugCountByTC[archiveConfirm.id] > 0 && (
+            <div className="flex flex-col gap-2 mb-4">
+              <button
+                onClick={() => handleArchive(archiveConfirm, true)}
+                className="w-full bg-amber-500 text-white font-semibold py-2 rounded-lg text-sm"
+              >
+                📦 Archive TC + {bugCountByTC[archiveConfirm.id]} linked bug{bugCountByTC[archiveConfirm.id] > 1 ? "s" : ""}
+              </button>
+              <button
+                onClick={() => handleArchive(archiveConfirm, false)}
+                className="w-full bg-amber-100 text-amber-700 font-semibold py-2 rounded-lg text-sm"
+              >
+                📦 Archive TC only
+              </button>
+            </div>
+          )}
+          {!bugCountByTC[archiveConfirm.id] && (
+            <button
+              onClick={() => handleArchive(archiveConfirm, false)}
+              className="w-full bg-amber-500 text-white font-semibold py-2 rounded-lg text-sm mb-2"
+            >
+              📦 Archive
+            </button>
+          )}
+          <button onClick={() => setArchiveConfirm(null)} className="w-full border border-gray-200 text-gray-600 font-semibold py-2 rounded-lg text-sm">Cancel</button>
+        </Modal>
+      )}
+
       {/* Edit drawer */}
       {editForm && (
         <Modal title={`Edit ${editForm.id}`} onClose={closeEdit}>
@@ -465,6 +538,13 @@ export function CasesTable({ project, onUpdate, clickUpConfig }: CasesTableProps
 
           <div className="flex gap-2 mt-4">
             <button onClick={saveEdit} disabled={uploading} className="flex-1 bg-indigo-600 text-white font-semibold py-2 rounded-lg disabled:opacity-50">Save</button>
+            <button
+              onClick={() => { closeEdit(); setArchiveConfirm(editForm); }}
+              className="bg-amber-500 text-white font-semibold py-2 px-4 rounded-lg"
+              title="Archive this test case"
+            >
+              📦
+            </button>
             <button onClick={closeEdit} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2 rounded-lg">Cancel</button>
           </div>
         </Modal>

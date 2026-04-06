@@ -45,6 +45,7 @@ export interface TestCase {
   attachmentUrl?: string;
   clickupTaskId?: string;
   clickupTaskUrl?: string;
+  archived?: boolean;
 }
 
 export interface Bug {
@@ -68,6 +69,7 @@ export interface Bug {
   attachmentUrl?: string;
   clickupTaskId?: string;
   clickupTaskUrl?: string;
+  archived?: boolean;
 }
 
 export interface ClickUpConfig {

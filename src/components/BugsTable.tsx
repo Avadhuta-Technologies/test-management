@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Bug, Project, ClickUpConfig } from "../types";
 import { BUG_STATUSES, PRIORITIES, SEVERITIES } from "../types";
-import { addBug, updateBug, uploadAttachment } from "../db";
+import { addBug, updateBug, uploadAttachment, archiveBug, unarchiveBug } from "../db";
 import { createClickUpTask, updateClickUpTask, fetchListTasks, clickupStatusToBugStatus } from "../clickup";
 import { Badge, Field, Inp, Modal, Sel, SmallSel } from "./ui";
 
@@ -30,6 +30,87 @@ function ClickUpChip({ taskId, taskUrl }: { taskId?: string; taskUrl?: string })
   );
 }
 
+type FormFieldsProps = {
+  form: Omit<Bug, "id"> | Bug;
+  set: (v: any) => void;
+  modules: readonly string[];
+  devs: readonly string[];
+  releases: readonly string[];
+};
+
+function BugFormFields({ form, set, modules, devs, releases }: FormFieldsProps) {
+  return (
+    <>
+      <Field label="Title"><Inp value={form.title} onChange={(e) => set({ ...form, title: e.target.value })} placeholder="Describe the bug" /></Field>
+      <Field label="Module"><Sel options={modules} value={form.module} onChange={(e) => set({ ...form, module: e.target.value })} /></Field>
+      <Field label="Linked TC"><Inp value={form.linkedTC} onChange={(e) => set({ ...form, linkedTC: e.target.value })} placeholder="e.g. TC-003" /></Field>
+      <Field label="Severity"><Sel options={SEVERITIES} value={form.severity} onChange={(e) => set({ ...form, severity: e.target.value as Bug["severity"] })} /></Field>
+      <Field label="Priority"><Sel options={PRIORITIES} value={form.priority} onChange={(e) => set({ ...form, priority: e.target.value as Bug["priority"] })} /></Field>
+      <Field label="Status"><Sel options={BUG_STATUSES} value={form.status} onChange={(e) => set({ ...form, status: e.target.value as Bug["status"] })} /></Field>
+      <Field label="Assigned Dev"><Sel options={devs} value={form.assignedDev} onChange={(e) => set({ ...form, assignedDev: e.target.value })} /></Field>
+      <Field label="Release"><Sel options={releases} value={form.release} onChange={(e) => set({ ...form, release: e.target.value })} /></Field>
+      <Field label="Reported Date"><Inp type="date" value={form.reportedDate} onChange={(e) => set({ ...form, reportedDate: e.target.value })} /></Field>
+      <Field label="Closed Date"><Inp type="date" value={form.closedDate ?? ""} onChange={(e) => set({ ...form, closedDate: e.target.value })} /></Field>
+      <Field label="Preconditions">
+        <textarea
+          value={form.preconditions ?? ""}
+          onChange={(e) => set({ ...form, preconditions: e.target.value })}
+          rows={2}
+          placeholder="Environment setup, required data, prior state…"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+        />
+      </Field>
+      <Field label="Description / Steps to Reproduce">
+        <textarea
+          value={form.description ?? ""}
+          onChange={(e) => set({ ...form, description: e.target.value })}
+          rows={3}
+          placeholder="Step-by-step actions to reproduce the bug…"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+        />
+      </Field>
+      <Field label="Expected Result">
+        <textarea
+          value={form.expectedResult ?? ""}
+          onChange={(e) => set({ ...form, expectedResult: e.target.value })}
+          rows={2}
+          placeholder="What should have happened…"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+        />
+      </Field>
+      <Field label="Actual Result">
+        <textarea
+          value={form.actualResult ?? ""}
+          onChange={(e) => set({ ...form, actualResult: e.target.value })}
+          rows={2}
+          placeholder="What actually happened (the bug behavior)…"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+        />
+      </Field>
+    </>
+  );
+}
+
+type FileFieldProps = { url?: string; onClear: () => void; onFile: (file: File) => void; uploading: boolean };
+
+function BugFileField({ url, onClear, onFile, uploading }: FileFieldProps) {
+  return (
+    <Field label="Attachment">
+      {url ? (
+        <div className="flex items-center gap-2">
+          <a href={url} target="_blank" rel="noreferrer" className="text-xs text-indigo-500 hover:underline truncate">📎 {url.split("/").pop()}</a>
+          <button onClick={onClear} className="text-xs text-red-400 hover:text-red-600">✕</button>
+        </div>
+      ) : (
+        <label className={`flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-600 cursor-pointer hover:border-indigo-400 hover:text-indigo-500 transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
+          {uploading ? "Uploading…" : "📎 Click to attach a file"}
+          <input type="file" className="hidden" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
+        </label>
+      )}
+    </Field>
+  );
+}
+
 export function BugsTable({ project, onUpdate, clickUpConfig }: BugsTableProps) {
   const { bugs, config } = project;
   const [search, setSearch] = useState("");
@@ -46,6 +127,7 @@ export function BugsTable({ project, onUpdate, clickUpConfig }: BugsTableProps) 
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
   const [cuError, setCuError] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
   const today = new Date().toISOString().split("T")[0];
 
   const blank: Omit<Bug, "id"> = {
@@ -67,7 +149,7 @@ export function BugsTable({ project, onUpdate, clickUpConfig }: BugsTableProps) 
   );
 
   const filtered = useMemo(() => {
-    let rows = [...bugs];
+    let rows = bugs.filter((b) => !!b.archived === showArchived);
     if (search) { const q = search.toLowerCase(); rows = rows.filter((b) => b.title.toLowerCase().includes(q) || b.id.toLowerCase().includes(q)); }
     if (fMod !== "All") rows = rows.filter((b) => b.module === fMod);
     if (fSt !== "All") rows = rows.filter((b) => b.status === fSt);
@@ -75,14 +157,21 @@ export function BugsTable({ project, onUpdate, clickUpConfig }: BugsTableProps) 
     if (fDev !== "All") rows = rows.filter((b) => b.assignedDev === fDev);
     rows.sort((a, b) => { const av = String(a[sortKey] ?? ""), bv = String(b[sortKey] ?? ""); return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av); });
     return rows;
-  }, [bugs, search, fMod, fSt, fSev, fDev, sortKey, sortDir]);
+  }, [bugs, search, fMod, fSt, fSev, fDev, sortKey, sortDir, showArchived]);
 
-  const handleFile = async (file: File, target: "add" | "edit") => {
+  const handleAddFile = async (file: File) => {
     setUploading(true);
     try {
       const url = await uploadAttachment(file, `bugs/${Date.now()}-${file.name}`);
-      if (target === "add") setAddForm((f) => ({ ...f, attachmentUrl: url }));
-      else setEditForm((f) => f ? { ...f, attachmentUrl: url } : f);
+      setAddForm((f) => ({ ...f, attachmentUrl: url }));
+    } finally { setUploading(false); }
+  };
+
+  const handleEditFile = async (file: File) => {
+    setUploading(true);
+    try {
+      const url = await uploadAttachment(file, `bugs/${Date.now()}-${file.name}`);
+      setEditForm((f) => f ? { ...f, attachmentUrl: url } : f);
     } finally { setUploading(false); }
   };
 
@@ -158,72 +247,16 @@ export function BugsTable({ project, onUpdate, clickUpConfig }: BugsTableProps) 
     }
   };
 
-  const FormFields = ({ form, set }: { form: Omit<Bug, "id"> | Bug; set: (v: any) => void }) => (
-    <>
-      <Field label="Title"><Inp value={form.title} onChange={(e) => set({ ...form, title: e.target.value })} placeholder="Describe the bug" /></Field>
-      <Field label="Module"><Sel options={config.modules} value={form.module} onChange={(e) => set({ ...form, module: e.target.value })} /></Field>
-      <Field label="Linked TC"><Inp value={form.linkedTC} onChange={(e) => set({ ...form, linkedTC: e.target.value })} placeholder="e.g. TC-003" /></Field>
-      <Field label="Severity"><Sel options={SEVERITIES} value={form.severity} onChange={(e) => set({ ...form, severity: e.target.value as Bug["severity"] })} /></Field>
-      <Field label="Priority"><Sel options={PRIORITIES} value={form.priority} onChange={(e) => set({ ...form, priority: e.target.value as Bug["priority"] })} /></Field>
-      <Field label="Status"><Sel options={BUG_STATUSES} value={form.status} onChange={(e) => set({ ...form, status: e.target.value as Bug["status"] })} /></Field>
-      <Field label="Assigned Dev"><Sel options={config.devs} value={form.assignedDev} onChange={(e) => set({ ...form, assignedDev: e.target.value })} /></Field>
-      <Field label="Release"><Sel options={config.releases} value={form.release} onChange={(e) => set({ ...form, release: e.target.value })} /></Field>
-      <Field label="Reported Date"><Inp type="date" value={form.reportedDate} onChange={(e) => set({ ...form, reportedDate: e.target.value })} /></Field>
-      <Field label="Closed Date"><Inp type="date" value={form.closedDate ?? ""} onChange={(e) => set({ ...form, closedDate: e.target.value })} /></Field>
-      <Field label="Preconditions">
-        <textarea
-          value={form.preconditions ?? ""}
-          onChange={(e) => set({ ...form, preconditions: e.target.value })}
-          rows={2}
-          placeholder="Environment setup, required data, prior state…"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
-        />
-      </Field>
-      <Field label="Description / Steps to Reproduce">
-        <textarea
-          value={form.description ?? ""}
-          onChange={(e) => set({ ...form, description: e.target.value })}
-          rows={3}
-          placeholder="Step-by-step actions to reproduce the bug…"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
-        />
-      </Field>
-      <Field label="Expected Result">
-        <textarea
-          value={form.expectedResult ?? ""}
-          onChange={(e) => set({ ...form, expectedResult: e.target.value })}
-          rows={2}
-          placeholder="What should have happened…"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
-        />
-      </Field>
-      <Field label="Actual Result">
-        <textarea
-          value={form.actualResult ?? ""}
-          onChange={(e) => set({ ...form, actualResult: e.target.value })}
-          rows={2}
-          placeholder="What actually happened (the bug behavior)…"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
-        />
-      </Field>
-    </>
-  );
+  const handleArchiveBug = async (bug: Bug) => {
+    await archiveBug(bug.id);
+    onUpdate({ ...project, bugs: bugs.map((b) => b.id === bug.id ? { ...b, archived: true } : b) });
+    setEditForm(null);
+  };
 
-  const FileField = ({ url, onClear, target }: { url?: string; onClear: () => void; target: "add" | "edit" }) => (
-    <Field label="Attachment">
-      {url ? (
-        <div className="flex items-center gap-2">
-          <a href={url} target="_blank" rel="noreferrer" className="text-xs text-indigo-500 hover:underline truncate">📎 {url.split("/").pop()}</a>
-          <button onClick={onClear} className="text-xs text-red-400 hover:text-red-600">✕</button>
-        </div>
-      ) : (
-        <label className={`flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-600 cursor-pointer hover:border-indigo-400 hover:text-indigo-500 transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
-          {uploading ? "Uploading…" : "📎 Click to attach a file"}
-          <input type="file" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0], target)} />
-        </label>
-      )}
-    </Field>
-  );
+  const handleUnarchiveBug = async (bug: Bug) => {
+    await unarchiveBug(bug.id);
+    onUpdate({ ...project, bugs: bugs.map((b) => b.id === bug.id ? { ...b, archived: false } : b) });
+  };
 
   return (
     <div>
@@ -244,7 +277,13 @@ export function BugsTable({ project, onUpdate, clickUpConfig }: BugsTableProps) 
         )}
         {syncMsg && <span className="text-xs text-green-600 font-semibold">{syncMsg}</span>}
         {cuError && !editForm && <span className="text-xs text-red-500">{cuError}</span>}
-        <button onClick={() => setShowAdd(true)} className="ml-auto bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">+ Log Bug</button>
+        <button
+          onClick={() => setShowArchived((v) => !v)}
+          className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${showArchived ? "bg-amber-100 text-amber-700 border-amber-300" : "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200"}`}
+        >
+          {showArchived ? "📦 Archived" : "📦 Show Archived"}
+        </button>
+        {!showArchived && <button onClick={() => setShowAdd(true)} className="ml-auto bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">+ Log Bug</button>}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
@@ -282,8 +321,23 @@ export function BugsTable({ project, onUpdate, clickUpConfig }: BugsTableProps) 
                 <td className="px-3 py-2"><AttachmentLink url={item.attachmentUrl} /></td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1">
-                    <span className="text-indigo-400 text-xs">✏️ edit</span>
+                    {!showArchived && <span className="text-indigo-400 text-xs">✏️ edit</span>}
                     <ClickUpChip taskId={item.clickupTaskId} taskUrl={item.clickupTaskUrl} />
+                    {showArchived ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleUnarchiveBug(item); }}
+                        className="text-xs bg-green-50 text-green-600 font-semibold px-2 py-0.5 rounded-full hover:bg-green-100"
+                      >
+                        ↩ Restore
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleArchiveBug(item); }}
+                        className="text-xs bg-amber-50 text-amber-600 font-semibold px-2 py-0.5 rounded-full hover:bg-amber-100"
+                      >
+                        📦 Archive
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -298,8 +352,8 @@ export function BugsTable({ project, onUpdate, clickUpConfig }: BugsTableProps) 
       {/* Add drawer */}
       {showAdd && (
         <Modal title="Log New Bug" onClose={() => setShowAdd(false)}>
-          <FormFields form={addForm} set={setAddForm} />
-          <FileField url={addForm.attachmentUrl} onClear={() => setAddForm({ ...addForm, attachmentUrl: "" })} target="add" />
+          <BugFormFields form={addForm} set={setAddForm} modules={config.modules} devs={config.devs} releases={config.releases} />
+          <BugFileField url={addForm.attachmentUrl} onClear={() => setAddForm({ ...addForm, attachmentUrl: "" })} onFile={handleAddFile} uploading={uploading} />
           <div className="flex gap-2 mt-4">
             <button onClick={saveAdd} disabled={uploading} className="flex-1 bg-red-500 text-white font-semibold py-2 rounded-lg disabled:opacity-50">Log Bug</button>
             <button onClick={() => setShowAdd(false)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2 rounded-lg">Cancel</button>
@@ -310,8 +364,8 @@ export function BugsTable({ project, onUpdate, clickUpConfig }: BugsTableProps) 
       {/* Edit drawer */}
       {editForm && (
         <Modal title={`Edit ${editForm.id}`} onClose={() => setEditForm(null)}>
-          <FormFields form={editForm} set={setEditForm} />
-          <FileField url={editForm.attachmentUrl} onClear={() => setEditForm({ ...editForm, attachmentUrl: "" })} target="edit" />
+          <BugFormFields form={editForm} set={setEditForm} modules={config.modules} devs={config.devs} releases={config.releases} />
+          <BugFileField url={editForm.attachmentUrl} onClear={() => setEditForm({ ...editForm, attachmentUrl: "" })} onFile={handleEditFile} uploading={uploading} />
 
           {/* ClickUp info */}
           {clickUpConfig && editForm.clickupTaskId && (
@@ -329,6 +383,13 @@ export function BugsTable({ project, onUpdate, clickUpConfig }: BugsTableProps) 
                 {pushing ? "Pushing…" : editForm.clickupTaskId ? "Update in ClickUp" : "Push to ClickUp"}
               </button>
             )}
+            <button
+              onClick={() => handleArchiveBug(editForm)}
+              className="bg-amber-500 text-white font-semibold py-2 px-4 rounded-lg"
+              title="Archive this bug"
+            >
+              📦
+            </button>
             <button onClick={() => setEditForm(null)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2 rounded-lg">Cancel</button>
           </div>
         </Modal>
